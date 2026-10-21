@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="tr" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="app_title">TestForge - Profesyonel Soru & Sınav Hazırlama Aracı</title>
+  <meta name="description" content="Kolayca soru ve cevaplar ekleyerek çoktan seçmeli, klasik veya doğru-yanlış testleri hazırlayın. PDF ve İnteraktif HTML olarak anında dışa aktarın.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/logo-ui.png">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="shortcut icon" href="favicon.ico">
+  <link rel="apple-touch-icon" href="assets/logo.png">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Harici Kütüphaneler (Lucide Icons, html2pdf, Confetti) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Uygulama Stilleri -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- Üst Başlık & Eylem Çubuğu (Header) -->
+    <header class="app-header">
+      <div id="btn-nav-brand" class="brand-section brand-clickable" data-i18n-title="brand_tooltip" title="Ana Sayfaya Dön (Mod Seçimi)">
+        <div class="logo-icon">
+          <img src="assets/logo-ui.png" alt="TestForge Logo" class="brand-logo-img">
+        </div>
+        <div>
+          <h1 class="brand-title">
+            TestForge
+            <span class="brand-badge">PRO</span>
+          </h1>
+        </div>
+      </div>
+
+      <!-- Sağ Eylem Butonları (Moda göre dinamik gösterilir) -->
+      <div class="header-actions">
+        <!-- Dışa Aktarma Butonları -->
+        <button id="btn-export-pdf" class="btn btn-primary" data-i18n-title="export_pdf_title" title="A4 Sınav Kağıdını PDF olarak indir" style="display:none;">
+          <i data-lucide="file-down"></i>
+          <span data-i18n="export_pdf">PDF İndir</span>
+        </button>
+
+        <button id="btn-export-html" class="btn btn-success" data-i18n-title="export_html_title" title="İnternetsiz de çalışan interaktif test dosyası" style="display:none;">
+          <i data-lucide="globe"></i>
+          <span data-i18n="export_html">İnteraktif HTML İndir</span>
+        </button>
+
+        <button id="btn-print" class="btn btn-secondary" data-i18n-title="print_btn_title" title="Doğrudan Yazdır (Ctrl+P)" style="display:none;">
+          <i data-lucide="printer"></i>
+          <span data-i18n="print_btn">Yazdır</span>
+        </button>
+
+        <!-- Navbar TR / EN Dil Seçici -->
+        <div class="lang-switcher" id="lang-switcher">
+          <button type="button" class="lang-btn active" data-lang="tr" onclick="setLanguage('tr')" title="Türkçe">TR</button>
+          <button type="button" class="lang-btn" data-lang="en" onclick="setLanguage('en')" title="English">EN</button>
+        </div>
+
+        <!-- Koyu/Açık Tema Değiştirici -->
+        <button id="theme-toggle-btn" class="btn btn-icon" data-i18n-title="theme_toggle_title" title="Temayı Değiştir">
+          <i data-lucide="moon"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 1. GÖRÜNÜM: ANASAYFA / KARŞILAMA VE MOD SEÇİM EKRANI -->
+    <main id="landing-view" class="landing-view">
+      <div class="landing-container">
+        <div class="landing-badge">
+          <img src="assets/logo-ui.png" alt="" class="landing-badge-icon" style="width: 18px; height: 18px; border-radius: 4px; object-fit: cover;">
+          <span data-i18n="landing_badge">TestForge Çalışma Alanı</span>
+        </div>
+        <h2 class="landing-title" data-i18n="landing_title">Nasıl Bir Çalışma Yapmak İstiyorsunuz?</h2>
+        <p class="landing-subtitle" data-i18n-html="landing_subtitle">
+          İhtiyacınıza uygun çalışma formatını seçin. İstediğiniz an sol üstteki <strong>TestForge</strong> logosuna tıklayarak bu ekrana dönebilirsiniz.
+        </p>
+
+        <!-- 2 BÜYÜK SEÇENEK KARTI -->
+        <div class="landing-cards-grid">
+          <!-- 1. KUTU: Test Oluştur -->
+          <div class="landing-card" onclick="openTemplateChoiceModal('test')">
+            <div>
+              <div class="landing-card-header">
+                <div class="landing-card-icon icon-test">
+                  <i data-lucide="sparkles"></i>
+                </div>
+                <span class="brand-badge" style="background:#fce7f3; color:#be185d;" data-i18n="card_test_badge">İnteraktif & Dijital</span>
+              </div>
+              <h3 class="landing-card-title" data-i18n="card_test_title">Test Oluştur</h3>
+              <p class="landing-card-desc" data-i18n="card_test_desc">
+                Okul ve sınav başlığı karmaşası olmadan, doğrudan sorularınızı ekleyin ve internetsiz de çalışan dijital bir test oluşturun.
+              </p>
+              <ul class="landing-card-features">
+                <li><i data-lucide="check"></i> <span data-i18n="card_test_feat1">Sadeleştirilmiş, doğrudan soru ekleme alanı</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_test_feat2">Tıklamada anında doğru / yanlış geri bildirimi</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_test_feat3">Çözüm ve açıklama notları (İpuçları)</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_test_feat4">Tarayıcıda doğrudan çalışan tek dosya HTML çıktısı</span></li>
+              </ul>
+            </div>
+            <button class="btn btn-success landing-action-btn">
+              <span data-i18n="card_test_btn">Test Oluştur</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+
+          <!-- 2. KUTU: Sınav Kağıdı Oluştur -->
+          <div class="landing-card" onclick="openTemplateChoiceModal('paper')">
+            <div>
+              <div class="landing-card-header">
+                <div class="landing-card-icon icon-paper">
+                  <i data-lucide="file-text"></i>
+                </div>
+                <span class="brand-badge" style="background:#dbeafe; color:#1d4ed8;" data-i18n="card_paper_badge">A4 Baskı & PDF</span>
+              </div>
+              <h3 class="landing-card-title" data-i18n="card_paper_title">Sınav Kağıdı Oluştur</h3>
+              <p class="landing-card-desc" data-i18n="card_paper_desc">
+                MEB ve okul formatında klasik yazılı sınav kağıdı hazırlayın. Boş bırakılan alanlar otomatik gizlenir.
+              </p>
+              <ul class="landing-card-features">
+                <li><i data-lucide="check"></i> <span data-i18n="card_paper_feat1">1 veya 2 Sütunlu gerçek A4 sayfa düzeni</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_paper_feat2">Akıllı kurum başlığı ve öğrenci bilgi kutucukları</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_paper_feat3">Optik form ve otomatik cevap anahtarı</span></li>
+                <li><i data-lucide="check"></i> <span data-i18n="card_paper_feat4">Vektörel PDF indirme ve doğrudan yazdırma</span></li>
+              </ul>
+            </div>
+            <button class="btn btn-primary landing-action-btn">
+              <span data-i18n="card_paper_btn">Sınav Kağıdı Oluştur</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 2. GÖRÜNÜM: ANA ÇALIŞMA ALANI (Çift Panelli Grid) -->
+    <div id="workspace-view" class="main-workspace" style="display:none;">
+      
+      <!-- SOL PANEL: Düzenleyici (Editor) -->
+      <aside class="editor-panel">
+        <!-- Sekmeler (Test modunda gizlenir, Sınav Kağıdı modunda gösterilir) -->
+        <div id="editor-tabs-bar" class="editor-tabs">
+          <button id="tab-questions-btn" class="tab-btn active">
+            <i data-lucide="list-checks"></i> <span data-i18n="tab_questions">Sorular</span>
+          </button>
+          <button id="tab-settings-btn" class="tab-btn">
+            <i data-lucide="sliders"></i> <span data-i18n="tab_settings">Sınav Ayarları & Başlık</span>
+          </button>
+        </div>
+
+        <!-- SEKME 1: Sorular Listesi -->
+        <div id="view-questions-tab" class="editor-body">
+          <!-- Hızlı Ekleme ve Aksiyonlar Kartı -->
+          <div class="editor-card">
+            <div class="card-title">
+              <span><i data-lucide="plus-circle" style="color:var(--primary);"></i> <span data-i18n="card_add_question">Yeni Soru Ekle</span></span>
+              <span id="total-questions-badge" class="brand-badge">0 Soru</span>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+              <button id="btn-add-multiple" class="btn btn-secondary btn-sm" style="flex:1;">
+                <i data-lucide="check-square"></i> <span data-i18n="type_multiple">Çoktan Seçmeli</span>
+              </button>
+              <button id="btn-add-tf" class="btn btn-secondary btn-sm" style="flex:1;">
+                <i data-lucide="toggle-left"></i> <span data-i18n="type_tf">Doğru / Yanlış</span>
+              </button>
+              <button id="btn-add-classic" class="btn btn-secondary btn-sm" style="flex:1;">
+                <i data-lucide="edit-3"></i> <span data-i18n="type_classic">Klasik</span>
+              </button>
+            </div>
+            <button id="btn-bulk-import-modal" class="btn btn-outline btn-sm" style="width:100%; margin-top:8px;">
+              <i data-lucide="file-text"></i> <span data-i18n="btn_bulk_import">Metinden Toplu Soru Ekle (Akıllı Ayrıştırıcı)</span>
+            </button>
+          </div>
+
+          <!-- Sorular Akordeon Listesi -->
+          <div id="editor-questions-list" class="question-list">
+            <!-- Sorular Javascript ile buraya dinamik yüklenir -->
+          </div>
+        </div>
+
+        <!-- SEKME 2: Sınav Ayarları & Kurumsal Başlık (Yalnızca Sınav Kağıdı Modunda) -->
+        <div id="view-settings-tab" class="editor-body" style="display: none;">
+          <div class="editor-card">
+            <div class="card-title">
+              <span><i data-lucide="school" style="color:var(--primary);"></i> <span data-i18n="settings_header_title">Sınav Kağıdı Üst Bilgisi</span></span>
+            </div>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;" data-i18n="settings_header_desc">
+              Boş bıraktığınız alanlar sınav kağıdında otomatik olarak gizlenir.
+            </p>
+            <div class="form-group">
+              <label class="form-label" data-i18n="lbl_institution">Kurum / Okul Adı</label>
+              <input type="text" id="setting-institution" class="form-input" data-i18n-placeholder="placeholder_institution" placeholder="Örn: ATATÜRK ANADOLU LİSESİ">
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-i18n="lbl_title">Sınav Başlığı</label>
+              <input type="text" id="setting-title" class="form-input" data-i18n-placeholder="placeholder_title" placeholder="Örn: 1. DÖNEM 2. YAZILI SINAVI">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" data-i18n="lbl_course">Ders Adı</label>
+                <input type="text" id="setting-course" class="form-input" data-i18n-placeholder="placeholder_course" placeholder="Örn: Fen Bilimleri">
+              </div>
+              <div class="form-group">
+                <label class="form-label" data-i18n="lbl_grade">Sınıf / Şube</label>
+                <input type="text" id="setting-grade" class="form-input" data-i18n-placeholder="placeholder_grade" placeholder="Örn: 10/A Sınıfı">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" data-i18n="lbl_duration">Sınav Süresi</label>
+                <input type="text" id="setting-duration" class="form-input" data-i18n-placeholder="placeholder_duration" placeholder="Örn: 40 Dakika">
+              </div>
+              <div class="form-group">
+                <label class="form-label" data-i18n="lbl_date">Sınav Tarihi</label>
+                <input type="text" id="setting-date" class="form-input" data-i18n-placeholder="placeholder_date" placeholder="Örn: 21.10.2025">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-i18n="lbl_instructions">Sınav Yönergesi</label>
+              <textarea id="setting-instructions" class="form-textarea" rows="2" data-i18n-placeholder="placeholder_instructions" placeholder="Sınav kuralları ve yönergesi..."></textarea>
+            </div>
+          </div>
+
+          <div class="editor-card">
+            <div class="card-title">
+              <span><i data-lucide="layout" style="color:var(--secondary);"></i> <span data-i18n="settings_components_title">Kağıt Bileşenleri & Görünüm</span></span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="setting-show-student-info" checked>
+                <span data-i18n="chk_student_info">Öğrenci Bilgi Alanını Göster (Ad-Soyad, No vb.)</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="setting-show-score" checked>
+                <span data-i18n="chk_score">Öğrenci Puan Kutucuğunu Göster</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="setting-show-answer-key" checked>
+                <span data-i18n="chk_answer_key">Kağıt Sonunda Cevap Anahtarını Göster</span>
+              </label>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                <input type="checkbox" id="setting-show-optical" checked>
+                <span data-i18n="chk_optical">Optik İşaretleme Formu Ekle</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- SAĞ PANEL: Canlı Önizleme & Çalışma Alanı -->
+      <main class="preview-panel">
+        <!-- Önizleme Araç Çubuğu -->
+        <div class="preview-toolbar">
+          <div class="preview-tools-left">
+            <span id="preview-mode-title" style="font-weight:700; font-size:0.88rem; display:flex; align-items:center; gap:6px;">
+              <i data-lucide="file-text" style="color:var(--primary);"></i> <span data-i18n="preview_title_paper">Canlı Sınav Kağıdı</span>
+            </span>
+            <!-- Sınav Kağıdı Araçları: 1 veya 2 Sütun -->
+            <button id="toggle-columns-btn" class="btn btn-secondary btn-sm" data-i18n-title="btn_2_cols" title="1 veya 2 Sütunlu Sayfa Düzeni">
+              <i data-lucide="columns-2"></i> <span id="toggle-columns-btn-text" data-i18n="btn_2_cols">2 Sütun</span>
+            </button>
+          </div>
+
+          <div class="preview-tools-right">
+            <!-- Test Modu Yenile Butonu (Sadece test modunda görünür) -->
+            <button id="btn-restart-digital-test" class="btn btn-secondary btn-sm" style="display:none;" data-i18n-title="btn_restart_test" title="Testi Baştan Başlat">
+              <i data-lucide="rotate-ccw"></i> <span data-i18n="btn_restart_test">Yeniden Başlat</span>
+            </button>
+
+            <!-- Sınav Kağıdı Yakınlaştırma & Tam Ekran Kontrolleri -->
+            <div id="paper-zoom-controls" style="display:flex; align-items:center; gap:4px;">
+              <button id="btn-zoom-out" class="btn btn-icon btn-sm" data-i18n-title="zoom_out" title="Uzaklaştır">
+                <i data-lucide="zoom-out"></i>
+              </button>
+              <span id="zoom-val-text" class="zoom-indicator">100%</span>
+              <button id="btn-zoom-in" class="btn btn-icon btn-sm" data-i18n-title="zoom_in" title="Yakınlaştır">
+                <i data-lucide="zoom-in"></i>
+              </button>
+              <button id="btn-zoom-reset" class="btn btn-icon btn-sm" data-i18n-title="zoom_reset" title="Varsayılan Boyut (%100)">
+                <i data-lucide="rotate-ccw"></i>
+              </button>
+              <button id="btn-fullscreen" class="btn btn-icon btn-sm" data-i18n-title="fullscreen_preview" title="Tam Ekran Önizleme">
+                <i data-lucide="maximize-2"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Önizleme Görünüm Alanı -->
+        <div class="preview-viewport">
+          <!-- 1. GÖRÜNÜM: A4 Sınav Kağıdı -->
+          <article id="exam-paper-page" class="a4-page">
+            <!-- A4 Sınav Kağıdı İçeriği Javascript ile dinamik render edilir -->
+          </article>
+
+          <!-- 2. GÖRÜNÜM: İnteraktif Dijital Test Modu -->
+          <section id="digital-test-view" class="digital-test-wrapper" style="display:none;">
+            <!-- Javascript ile render edilir -->
+          </section>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- MODAL: Başlangıç Şablonu Seçimi (Boş Sayfa vs Örnek Sınav) -->
+  <div id="template-choice-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title">
+            <i data-lucide="sparkles" style="color:var(--primary);"></i>
+            <span data-i18n="template_modal_title">Nasıl Başlamak İstiyorsunuz?</span>
+          </h2>
+          <p id="template-modal-subtitle" style="font-size:0.83rem; color:var(--text-muted); margin-top:3px;" data-i18n="template_sub_paper">
+            Sınav Kağıdı Modu için başlangıç yöntemini seçin:
+          </p>
+        </div>
+        <button id="btn-close-template-modal" class="btn btn-icon" onclick="closeTemplateChoiceModal()">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="template-choice-grid">
+          <!-- 1. Seçenek: Boş Sayfa ile Sıfırdan Başla -->
+          <div class="template-choice-card" onclick="startWithEmptyTemplate()">
+            <div>
+              <div class="template-choice-card-header">
+                <div class="template-choice-icon icon-empty-template">
+                  <i data-lucide="file-plus-2"></i>
+                </div>
+                <span class="brand-badge" style="background:var(--primary-light); color:var(--primary);" data-i18n="template_empty_badge">Sıfırdan Başla</span>
+              </div>
+              <h3 class="template-choice-title" data-i18n="template_empty_title">Boş Kağıttan Başla</h3>
+              <p class="template-choice-desc" data-i18n="template_empty_desc">
+                Tertemiz, boş bir sayfa açılır. Başlık bilgilerini ve kendi sorularınızı sıfırdan tek tek eklersiniz.
+              </p>
+            </div>
+            <button class="btn btn-primary template-choice-btn">
+              <span data-i18n="template_empty_btn">Boş Sayfayı Aç</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+
+          <!-- 2. Seçenek: Örnek Sınav Kağıdını Düzenle -->
+          <div class="template-choice-card" onclick="startWithSampleTemplate()">
+            <div>
+              <div class="template-choice-card-header">
+                <div class="template-choice-icon icon-sample-template">
+                  <i data-lucide="file-check"></i>
+                </div>
+                <span class="brand-badge" style="background:#d1fae5; color:#059669;" data-i18n="template_sample_badge">Hazır Şablon</span>
+              </div>
+              <h3 class="template-choice-title" data-i18n="template_sample_title">Örnek Sınavı Düzenle</h3>
+              <p class="template-choice-desc" data-i18n="template_sample_desc">
+                Örnek sorular, hazır başlık ve kurum bilgileri yüklenir. Mevcut sorular üzerinde hemen düzenleme yapabilirsiniz.
+              </p>
+            </div>
+            <button class="btn btn-success template-choice-btn">
+              <span data-i18n="template_sample_btn">Örnek Sınavı Yükle</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Hızlı / Toplu Metin Ayrıştırıcı -->
+  <div id="bulk-modal-overlay" class="modal-overlay">
+    <div class="modal-box modal-box-large bulk-modal-box">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="bulk-modal-icon">
+            <i data-lucide="sparkles"></i>
+          </div>
+          <div>
+            <h2 class="modal-title" style="margin:0;">
+              <span data-i18n="bulk_modal_title">Metinden Toplu Soru Ekle</span>
+              <span class="brand-badge" style="font-size:0.7rem; font-weight:700; margin-left:6px;" data-i18n="bulk_modal_badge">AKILLI AYRIŞTIRICI PRO</span>
+            </h2>
+            <p style="font-size:0.8rem; color:var(--text-muted); margin:2px 0 0 0;" data-i18n="bulk_modal_desc">
+              Word, PDF, web veya yapay zekadan aldığınız soruları serbestçe yapıştırın. Sistem otomatik ayıklar.
+            </p>
+          </div>
+        </div>
+        <button id="btn-close-bulk-modal" class="btn btn-icon" title="Kapat">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <!-- Ara Araç Çubuğu (Toolbar): Örnek Formatlar & AI Prompt & Temizle -->
+      <div class="bulk-toolbar">
+        <div class="bulk-toolbar-left">
+          <span class="bulk-toolbar-label">
+            <i data-lucide="file-code" style="width:14px; height:14px;"></i> <span data-i18n="bulk_sample_formats">Örnek Formatlar:</span>
+          </span>
+          <button type="button" class="btn btn-secondary btn-xs btn-sample-format" data-sample="standard" title="Klasik A, B, C, D alt alta sorular" data-i18n="bulk_fmt_standard">
+            Standart Çoktan Seçmeli
+          </button>
+          <button type="button" class="btn btn-secondary btn-xs btn-sample-format" data-sample="inline" title="Yan yana dizilmiş A) B) C) şıklar" data-i18n="bulk_fmt_inline">
+            Yan Yana Şıklar
+          </button>
+          <button type="button" class="btn btn-secondary btn-xs btn-sample-format" data-sample="answerkey" title="Cevap anahtarı en altta olan testler" data-i18n="bulk_fmt_answerkey">
+            Altta Cevap Anahtarlı
+          </button>
+          <button type="button" class="btn btn-secondary btn-xs btn-sample-format" data-sample="mixed" title="Doğru/Yanlış ve Klasik sorular" data-i18n="bulk_fmt_mixed">
+            Karışık Format
+          </button>
+        </div>
+        <div class="bulk-toolbar-right">
+          <button type="button" id="btn-copy-ai-prompt" class="btn btn-outline btn-xs" title="ChatGPT/Gemini'ye yapıştırmak için hazır formatlama istemi kopyalar">
+            <i data-lucide="bot" style="width:14px; height:14px;"></i> <span data-i18n="btn_copy_ai_prompt">AI İstemi Kopyala</span>
+          </button>
+          <button type="button" id="btn-clear-bulk" class="btn btn-outline btn-xs btn-danger-text" title="Metin alanını temizle">
+            <i data-lucide="trash-2" style="width:14px; height:14px;"></i> <span data-i18n="btn_clear">Temizle</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body bulk-modal-body">
+        <div class="bulk-grid-container">
+          <!-- Sol Sütun: Metin Girişi -->
+          <div class="bulk-input-column">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <label for="bulk-import-textarea" class="form-label" style="margin:0; font-weight:600;">
+                <i data-lucide="clipboard-paste" style="width:14px; height:14px; vertical-align:middle;"></i> <span data-i18n="bulk_paste_label">Soru Metinlerini Yapıştırın:</span>
+              </label>
+              <span id="bulk-char-count" style="font-size:0.75rem; color:var(--text-muted);">0 karakter</span>
+            </div>
+            <textarea id="bulk-import-textarea" class="form-textarea bulk-textarea" placeholder="Sorularınızı buraya yapıştırın...
+
+Örnek Formatlar (Her biri desteklenir):
+1. Türkiye'nin başkenti neresidir?
+A) İstanbul   B) Ankara   C) İzmir   D) Bursa
+Cevap: B
+
+2. Işık sesten hızlı yayılır.
+A) Doğru   B) Yanlış
+Cevap: A
+
+Soru 3: Maddenin 4. hali nedir?
+*A) Plazma
+B) Katı
+C) Sıvı
+D) Gaz
+
+4. Fotosentez denklemini yazınız."></textarea>
+            
+            <!-- Akıllı Ayrıştırıcı Yetenekleri Özeti -->
+            <div class="bulk-feature-chips">
+              <span class="feature-chip" title="A) B) C) yan yana olsa bile anında algılanır"><i data-lucide="check"></i> <span data-i18n="chip_inline">Yan yana şıklar (A B C D)</span></span>
+              <span class="feature-chip" title="1., 1), Soru 1, [1] veya numarasız tanır"><i data-lucide="check"></i> <span data-i18n="chip_flexible">Esnek Soru No (Soru 1, 1-, [1])</span></span>
+              <span class="feature-chip" title="*A) veya [x] A) şeklinde doğru cevap işaretini anlar"><i data-lucide="check"></i> <span data-i18n="chip_star">Yıldızlı Şık (*A)</span></span>
+              <span class="feature-chip" title="Metin sonundaki Cevap Anahtarı: 1-B, 2-C bloklarını okur"><i data-lucide="check"></i> <span data-i18n="chip_key">Sondaki Cevap Anahtarı</span></span>
+            </div>
+          </div>
+
+          <!-- Sağ Sütun: Canlı Önizleme & Algılanan Sorular -->
+          <div class="bulk-preview-column">
+            <div class="bulk-preview-header">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:0.85rem; font-weight:600;" data-i18n="bulk_preview_title">Canlı Algılama & Önizleme</span>
+                <span id="bulk-detected-badge" class="badge" style="background:var(--bg-input); border:1px solid var(--border-color); font-size:0.75rem; padding:2px 8px; border-radius:12px;">0 Soru</span>
+              </div>
+              <div id="bulk-type-badges" class="bulk-type-badges"></div>
+            </div>
+
+            <div id="bulk-preview-list" class="bulk-preview-list">
+              <div class="bulk-empty-state">
+                <div class="bulk-empty-icon"><i data-lucide="file-search"></i></div>
+                <div class="bulk-empty-title" data-i18n="bulk_empty_title">Henüz soru algılanmadı</div>
+                <div class="bulk-empty-desc" data-i18n="bulk_empty_desc">
+                  Sol tarafa sorularınızı yapıştırın veya yukarıdaki <strong>Örnek Format</strong> butonlarına tıklayarak nasıl çalıştığını test edin.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer bulk-modal-footer">
+        <div class="bulk-footer-status">
+          <span id="bulk-footer-info" style="font-size:0.85rem; color:var(--text-muted); display:flex; align-items:center; gap:6px;">
+            <i data-lucide="info" style="width:16px; height:16px;"></i> <span id="bulk-footer-info-text" data-i18n="bulk_footer_info_empty">Soru eklemek için metin yapıştırın.</span>
+          </span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button type="button" onclick="closeBulkModal()" class="btn btn-secondary" data-i18n="btn_cancel">Vazgeç</button>
+          <button type="button" id="btn-execute-bulk" class="btn btn-primary" disabled>
+            <i data-lucide="plus-circle"></i> <span id="btn-execute-bulk-text">Soruları Ekle (0 Soru)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Bildirim Konteyneri -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Scriptler -->
+  <script src="js/i18n.js"></script>
+  <script src="js/sample-data.js"></script>
+  <script src="js/exporter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
+
