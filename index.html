@@ -270,18 +270,22 @@
                 <label class="form-label" for="setting-test-title" data-i18n="lbl_test_title">Test İsmi / Başlığı</label>
                 <input type="text" id="setting-test-title" class="form-input" data-i18n-placeholder="placeholder_test_title" placeholder="Örn: 1. Ünite Değerlendirme Testi">
               </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label class="form-label" for="setting-test-course" data-i18n="lbl_test_course">Ders İsmi</label>
-                  <input type="text" id="setting-test-course" class="form-input" data-i18n-placeholder="placeholder_test_course" placeholder="Örn: Fizik">
-                </div>
-                <div class="form-group">
+              <div class="form-group">
+                <label class="form-label" for="setting-test-course" data-i18n="lbl_test_course">Ders İsmi</label>
+                <input type="text" id="setting-test-course" class="form-input" data-i18n-placeholder="placeholder_test_course" placeholder="Örn: Fizik">
+              </div>
+              <div class="test-duration-box">
+                <label class="test-duration-toggle">
+                  <input type="checkbox" id="setting-test-timed">
+                  <span data-i18n="lbl_test_timed">Süre sınırı ekle (İsteğe bağlı)</span>
+                </label>
+                <div class="form-group" id="test-duration-input-wrap" style="margin-bottom:0;">
                   <label class="form-label" for="setting-test-duration-minutes" data-i18n="lbl_test_duration_min">Test Süresi (Dakika)</label>
-                  <input type="number" id="setting-test-duration-minutes" class="form-input" min="0" max="600" step="1" placeholder="Örn: 30">
+                  <input type="number" id="setting-test-duration-minutes" class="form-input" min="1" max="600" step="1" data-i18n-placeholder="placeholder_test_duration_min" placeholder="Örn: 30">
                 </div>
               </div>
-              <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.45; margin-top:4px;" data-i18n="test_duration_hint">
-                0 girerseniz test süresiz olur. Süre girildiğinde HTML dosyasında "Sınava Başla" butonuna basınca geri sayım başlar ve süre bitince sınav otomatik tamamlanır.
+              <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.45; margin-top:6px;" data-i18n="test_duration_hint">
+                İşaretli değilse test süresiz olur. Süre eklendiğinde HTML dosyasında "Sınava Başla" butonuna basınca geri sayım başlar ve süre bitince sınav otomatik tamamlanır.
               </p>
             </div>
 

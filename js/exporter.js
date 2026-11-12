@@ -910,7 +910,7 @@ const Exporter = {
       <div class="test-meta-pills">
         <span class="pill">${escapeBuildHtml(ui.courseLabel)}: ${escapeBuildHtml(resolvedCourse)}</span>
         <span class="pill">${escapeBuildHtml(ui.totalLabel)}: ${safeExamData.questions.length}</span>
-        <span class="pill timer-pill" id="timer-display">${escapeBuildHtml(ui.durationLabel)}: ${escapeBuildHtml(initialDurationText)}</span>
+        <span class="pill ${durationMinutes > 0 ? 'timer-pill' : ''}" id="timer-display">${escapeBuildHtml(ui.durationLabel)}: ${escapeBuildHtml(initialDurationText)}</span>
       </div>
       <div class="progress-bar-container" id="progress-bar-container" style="display: none;">
         <div class="progress-bar-fill" id="progress-bar"></div>

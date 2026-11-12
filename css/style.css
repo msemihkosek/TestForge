@@ -2134,6 +2134,35 @@ button {
   gap: 1.25rem;
 }
 
+.test-duration-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.test-duration-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.test-duration-toggle input[type="checkbox"] {
+  accent-color: var(--primary);
+}
+
+#test-duration-input-wrap.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .test-behavior-grid {
   display: flex;
   flex-direction: column;

@@ -207,8 +207,10 @@ function startWithEmptyTemplate() {
         : "",
       course: "",
       classGrade: "",
-      duration: isEn ? "40 Minutes" : "40 Dakika",
-      durationMinutes: 40,
+      duration: (pendingSelectedMode === 'paper')
+        ? (isEn ? "40 Minutes" : "40 Dakika")
+        : (isEn ? "Untimed" : "Süresiz"),
+      durationMinutes: (pendingSelectedMode === 'paper') ? 40 : 0,
       testModeBehavior: "lock_reveal",
       participantFields: [],
       resultSharing: {
@@ -573,7 +575,10 @@ function populateSettingsInputs() {
   setVal('setting-test-course', meta.course || '');
   setVal('setting-grade', meta.classGrade || '');
   setVal('setting-duration', meta.duration || '');
-  setVal('setting-test-duration-minutes', meta.durationMinutes || 0);
+  const durMins = Number(meta.durationMinutes) || 0;
+  setChk('setting-test-timed', durMins > 0);
+  setVal('setting-test-duration-minutes', durMins > 0 ? durMins : '');
+  updateTestDurationPanelUI();
   setVal('setting-date', meta.examDate || '');
   setVal('setting-instructions', meta.instructions || '');
 
@@ -603,6 +608,19 @@ function updateResultSharingPanelUI() {
   const chk = document.getElementById('setting-share-enabled');
   if (panel && chk) {
     panel.classList.toggle('is-disabled', !chk.checked);
+  }
+}
+
+function updateTestDurationPanelUI() {
+  const wrap = document.getElementById('test-duration-input-wrap');
+  const timedChk = document.getElementById('setting-test-timed');
+  const durInput = document.getElementById('setting-test-duration-minutes');
+  const isTimed = !!(timedChk && timedChk.checked);
+  if (wrap) {
+    wrap.classList.toggle('is-disabled', !isTimed);
+  }
+  if (durInput) {
+    durInput.disabled = !isTimed;
   }
 }
 
@@ -706,28 +724,61 @@ function bindSettingsInputs() {
   bindText('setting-instructions', 'instructions');
 
   const paperDurationEl = document.getElementById('setting-duration');
+  const testTimedEl = document.getElementById('setting-test-timed');
+  const testDurationEl = document.getElementById('setting-test-duration-minutes');
+
   if (paperDurationEl) {
     paperDurationEl.addEventListener('input', (e) => {
       examData.meta.duration = e.target.value;
       const mins = parseDurationMinutesFromText(e.target.value);
       examData.meta.durationMinutes = mins;
-      const testDurEl = document.getElementById('setting-test-duration-minutes');
-      if (testDurEl) testDurEl.value = mins;
+      if (testTimedEl) testTimedEl.checked = (mins > 0);
+      if (testDurationEl) testDurationEl.value = mins > 0 ? mins : '';
+      updateTestDurationPanelUI();
       saveData();
     });
   }
 
-  const testDurationEl = document.getElementById('setting-test-duration-minutes');
+  if (testTimedEl) {
+    testTimedEl.addEventListener('change', (e) => {
+      const isEn = (getLanguage() === 'en');
+      if (e.target.checked) {
+        const existing = parseInt(testDurationEl ? testDurationEl.value : '', 10);
+        const mins = (Number.isFinite(existing) && existing > 0) ? Math.min(existing, 600) : 30;
+        examData.meta.durationMinutes = mins;
+        examData.meta.duration = `${mins} ${isEn ? 'Minutes' : 'Dakika'}`;
+        if (testDurationEl) {
+          testDurationEl.value = mins;
+          testDurationEl.disabled = false;
+          if (typeof testDurationEl.focus === 'function') testDurationEl.focus();
+        }
+      } else {
+        examData.meta.durationMinutes = 0;
+        examData.meta.duration = isEn ? 'Untimed' : 'Süresiz';
+        if (testDurationEl) {
+          testDurationEl.value = '';
+        }
+      }
+      if (paperDurationEl) paperDurationEl.value = examData.meta.duration;
+      updateTestDurationPanelUI();
+      saveData();
+    });
+  }
+
   if (testDurationEl) {
     testDurationEl.addEventListener('input', (e) => {
       const raw = parseInt(e.target.value, 10);
       const mins = (Number.isFinite(raw) && raw > 0) ? Math.min(raw, 600) : 0;
       examData.meta.durationMinutes = mins;
+      if (testTimedEl && mins > 0) {
+        testTimedEl.checked = true;
+      }
       const isEn = (getLanguage() === 'en');
       examData.meta.duration = mins > 0
         ? `${mins} ${isEn ? 'Minutes' : 'Dakika'}`
         : (isEn ? 'Untimed' : 'Süresiz');
       if (paperDurationEl) paperDurationEl.value = examData.meta.duration;
+      updateTestDurationPanelUI();
       saveData();
     });
   }
