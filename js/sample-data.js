@@ -16,9 +16,11 @@ const SAMPLE_EXAM_DATA = {
       enabled: false,
       email: "",
       emailButtonLabel: "",
-      allowEmail: true,
-      allowCopy: true,
-      allowDownloadTxt: true
+      allowGmail: true,
+      allowOutlook: false,
+      allowWhatsapp: true,
+      allowDownloadImage: true,
+      certificateTemplateImage: ""
     },
     examDate: "21.10.2025",
     instructions: "Sınav süresi 40 dakikadır. Çoktan seçmeli sorularda yalnızca bir doğru seçenek vardır. Yanlış cevaplar doğruları götürmez. Başarılar dileriz.",

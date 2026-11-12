@@ -179,6 +179,13 @@
             <button id="btn-bulk-import-modal" class="btn btn-outline btn-sm" style="width:100%; margin-top:8px;">
               <i data-lucide="file-text"></i> <span data-i18n="btn_bulk_import">Metinden Toplu Soru Ekle (Akıllı Ayrıştırıcı)</span>
             </button>
+            <div class="questions-points-toolbar">
+              <span class="questions-points-label" data-i18n="lbl_distribute_points">Tüm Soruları Eşitle:</span>
+              <input type="number" id="distribute-total-input" class="form-input questions-points-input" value="100" min="1" max="10000" step="any">
+              <button type="button" id="btn-distribute-points" class="btn btn-outline btn-xs" onclick="distributeExistingQuestionsPoints()">
+                <i data-lucide="calculator" style="width:13px; height:13px;"></i> <span data-i18n="btn_distribute_points">Puana Dağıt</span>
+              </button>
+            </div>
           </div>
 
           <!-- Sorular Akordeon Listesi -->
@@ -337,7 +344,7 @@
                 <span data-i18n="test_sharing_enable">Test bitiminde sonuç iletme / paylaşma seçeneklerini göster</span>
               </label>
               <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:10px; line-height:1.45;" data-i18n="test_sharing_desc">
-                Aktif edildiğinde, dışa aktarılan HTML testi tamamlandığında sonuçları e-posta olarak gönderme, panoya kopyalama veya metin belgesi indirme seçenekleri sunulur.
+                Aktif edildiğinde, dışa aktarılan HTML testi tamamlandığında Gmail / Outlook Web / WhatsApp ile sonuç iletme ve şablon resim (PNG) olarak sonuç belgesi indirme seçenekleri sunulur.
               </p>
               <div id="result-sharing-options" class="sharing-options-panel">
                 <div class="form-group">
@@ -346,21 +353,43 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label" for="setting-share-email-label" data-i18n="lbl_share_email_btn">E-posta Buton Yazısı (İsteğe Bağlı)</label>
-                  <input type="text" id="setting-share-email-label" class="form-input" data-i18n-placeholder="placeholder_share_email_btn" placeholder="Varsayılan: Sonucu E-posta ile Gönder">
+                  <input type="text" id="setting-share-email-label" class="form-input" data-i18n-placeholder="placeholder_share_email_btn" placeholder="Varsayılan: Gmail ile Gönder">
                 </div>
                 <div class="sharing-checkbox-list">
                   <label class="sharing-check-item">
-                    <input type="checkbox" id="setting-share-allow-email" checked>
-                    <span data-i18n="chk_share_email">E-posta ile Gönder butonu (Alıcı e-posta girildiğinde görünür)</span>
+                    <input type="checkbox" id="setting-share-allow-gmail" checked>
+                    <span data-i18n="chk_share_gmail">Gmail ile Gönder butonu (Alıcı e-posta girildiğinde görünür)</span>
                   </label>
                   <label class="sharing-check-item">
-                    <input type="checkbox" id="setting-share-allow-copy" checked>
-                    <span data-i18n="chk_share_copy">Sonuç Özetini Kopyala butonu</span>
+                    <input type="checkbox" id="setting-share-allow-outlook">
+                    <span data-i18n="chk_share_outlook">Outlook Web ile Gönder butonu (Alıcı e-posta girildiğinde görünür)</span>
                   </label>
                   <label class="sharing-check-item">
-                    <input type="checkbox" id="setting-share-allow-download" checked>
-                    <span data-i18n="chk_share_download">Sonuç Belgesini İndir (.txt) butonu</span>
+                    <input type="checkbox" id="setting-share-allow-whatsapp" checked>
+                    <span data-i18n="chk_share_whatsapp">WhatsApp ile Paylaş butonu</span>
                   </label>
+                  <label class="sharing-check-item">
+                    <input type="checkbox" id="setting-share-allow-image" checked>
+                    <span data-i18n="chk_share_image">Sonuç Belgesi İndir (Hazır Şablon PNG Resim)</span>
+                  </label>
+                </div>
+                <div class="form-group" style="margin-top:4px; margin-bottom:0;">
+                  <label class="form-label" data-i18n="lbl_share_template_img">Sonuç Belgesi Şablon Görseli (İsteğe Bağlı)</label>
+                  <div class="template-upload-row">
+                    <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                      <i data-lucide="image-plus"></i> <span data-i18n="btn_upload_template_img">Özel Şablon Resim Yükle</span>
+                      <input type="file" id="setting-share-template-file" accept="image/*" style="display:none;">
+                    </label>
+                    <button type="button" id="btn-remove-share-template" class="btn btn-outline btn-sm" style="display:none;">
+                      <i data-lucide="trash-2"></i> <span data-i18n="btn_remove_template_img">Hazır Şablona Dön</span>
+                    </button>
+                  </div>
+                  <div id="share-template-preview-wrap" class="share-template-preview-wrap" style="display:none;">
+                    <img id="share-template-preview-img" src="" alt="Template Preview">
+                  </div>
+                  <p style="font-size:0.72rem; color:var(--text-muted); margin-top:4px; line-height:1.4;" data-i18n="share_template_hint">
+                    Resim yüklemezseniz TestForge'un hazır sonuç belgesi şablonu kullanılır ve bilgiler bu görselin üzerine yazılır.
+                  </p>
                 </div>
               </div>
             </div>
@@ -585,6 +614,21 @@ D) Gaz
                 <span id="bulk-detected-badge" class="badge" style="background:var(--bg-input); border:1px solid var(--border-color); font-size:0.75rem; padding:2px 8px; border-radius:12px;">0 Soru</span>
               </div>
               <div id="bulk-type-badges" class="bulk-type-badges"></div>
+            </div>
+
+            <!-- Toplu Puan Dağıtımı Seçeneği -->
+            <div class="bulk-points-bar">
+              <span class="bulk-points-title" data-i18n="bulk_pts_title">Puanlama:</span>
+              <label class="bulk-points-option">
+                <input type="radio" name="bulk-points-mode" id="bulk-points-mode-equal" value="equal_total" checked>
+                <span data-i18n="bulk_pts_equal_total">Toplam Puana Dağıt</span>
+                <input type="number" id="bulk-target-total" class="form-input bulk-points-num" value="100" min="1" max="10000" step="any">
+              </label>
+              <label class="bulk-points-option">
+                <input type="radio" name="bulk-points-mode" id="bulk-points-mode-fixed" value="fixed">
+                <span data-i18n="bulk_pts_fixed">Sabit Puan/Soru</span>
+                <input type="number" id="bulk-fixed-points" class="form-input bulk-points-num" value="10" min="0" max="10000" step="any">
+              </label>
             </div>
 
             <div id="bulk-preview-list" class="bulk-preview-list">

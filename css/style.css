@@ -2323,6 +2323,29 @@ button {
   accent-color: var(--primary);
 }
 
+.template-upload-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.share-template-preview-wrap {
+  margin-top: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-input);
+  max-height: 120px;
+}
+
+.share-template-preview-wrap img {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+}
+
 .nlm-topic-badge {
   font-size: 0.75rem;
   font-weight: 700;
@@ -2551,8 +2574,8 @@ button {
 }
 
 .nlm-score-badge-circle {
-  width: 110px;
-  height: 110px;
+  width: 126px;
+  height: 126px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: #fff;
@@ -2561,6 +2584,7 @@ button {
   align-items: center;
   justify-content: center;
   margin: 0 auto 1.25rem;
+  padding: 0 8px;
   box-shadow: 0 10px 25px var(--primary-glow);
 }
 
@@ -2629,6 +2653,67 @@ button {
 @keyframes toastSlide {
   0% { transform: translateY(20px); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
+}
+
+.questions-points-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  flex-wrap: wrap;
+}
+
+.questions-points-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-right: auto;
+}
+
+.questions-points-input,
+.bulk-points-num {
+  width: 68px !important;
+  padding: 0.25rem 0.45rem !important;
+  font-size: 0.78rem !important;
+  text-align: center;
+}
+
+.bulk-points-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 0.5rem 0.85rem;
+  background: var(--bg-main);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.78rem;
+}
+
+.bulk-points-title {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.bulk-points-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.bulk-card-pts-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--primary-light);
+  color: var(--primary);
+  margin-left: auto;
+  margin-right: 6px;
 }
 
 /* PRINT STYLESHEET (@media print) */

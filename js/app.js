@@ -74,6 +74,86 @@ function parseDurationMinutesFromText(durationText) {
   return Number.isFinite(val) && val > 0 ? Math.min(val, 600) : 0;
 }
 
+function getQuestionPoints(q) {
+  if (!q || q.points === '' || q.points === null || q.points === undefined) return 10;
+  const n = Number(q.points);
+  return Number.isFinite(n) && n >= 0 ? n : 10;
+}
+
+function formatPoints(val) {
+  const n = Number(val);
+  if (!Number.isFinite(n)) return '0';
+  return String(Math.round(n * 1000) / 1000);
+}
+
+function distributeTargetPoints(count, targetTotal = 100) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n === 0) return [];
+  const total = Number(targetTotal);
+  const safeTotal = (Number.isFinite(total) && total > 0) ? total : 100;
+
+  // Check if exact up to 3 decimals (e.g., 100 / 160 = 0.625, 100 / 40 = 2.5)
+  const rawPerQ = safeTotal / n;
+  const rounded3 = Math.round(rawPerQ * 1000) / 1000;
+  if (Math.round(rounded3 * n * 1000) === Math.round(safeTotal * 1000)) {
+    return new Array(n).fill(rounded3);
+  }
+
+  // Otherwise distribute at 2 decimal precision with remainder on leading items so sum is exact
+  const totalCents = Math.round(safeTotal * 100);
+  const baseCents = Math.floor(totalCents / n);
+  const rem = totalCents - baseCents * n;
+  const result = [];
+  for (let i = 0; i < n; i++) {
+    const cents = baseCents + (i < rem ? 1 : 0);
+    result.push(Math.round(cents) / 100);
+  }
+  return result;
+}
+
+function getBulkPointsSettings() {
+  const fixedEl = document.getElementById('bulk-points-mode-fixed');
+  const targetInput = document.getElementById('bulk-target-total');
+  const fixedInput = document.getElementById('bulk-fixed-points');
+  const mode = (fixedEl && fixedEl.checked) ? 'fixed' : 'equal_total';
+  const targetVal = targetInput ? Number(targetInput.value) : 100;
+  const fixedVal = fixedInput ? Number(fixedInput.value) : 10;
+  return {
+    mode,
+    targetTotal: (Number.isFinite(targetVal) && targetVal > 0) ? targetVal : 100,
+    fixedPerQ: (Number.isFinite(fixedVal) && fixedVal >= 0) ? fixedVal : 10
+  };
+}
+
+function getBulkPointsDistribution(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0));
+  if (n === 0) return [];
+  const settings = getBulkPointsSettings();
+  if (settings.mode === 'fixed') {
+    return new Array(n).fill(Math.round(settings.fixedPerQ * 1000) / 1000);
+  }
+  return distributeTargetPoints(n, settings.targetTotal);
+}
+
+function distributeExistingQuestionsPoints() {
+  if (!examData || !Array.isArray(examData.questions) || examData.questions.length === 0) {
+    showToast(getLanguage() === 'en' ? 'Add questions first.' : 'Önce soru ekleyin.', 'info');
+    return;
+  }
+  const inp = document.getElementById('distribute-total-input');
+  const rawTotal = inp ? Number(inp.value) : 100;
+  const targetTotal = (Number.isFinite(rawTotal) && rawTotal > 0) ? rawTotal : 100;
+  if (inp) inp.value = formatPoints(targetTotal);
+
+  const dist = distributeTargetPoints(examData.questions.length, targetTotal);
+  examData.questions.forEach((q, idx) => {
+    q.points = dist[idx];
+  });
+  saveData();
+  renderQuestionsList();
+  showToast(t('toast_points_distributed', { total: formatPoints(targetTotal) }), 'success');
+}
+
 function ensureMetaDefaults() {
   if (!examData) return;
   if (!examData.meta) examData.meta = {};
@@ -102,18 +182,23 @@ function ensureMetaDefaults() {
       enabled: false,
       email: "",
       emailButtonLabel: "",
-      allowEmail: true,
-      allowCopy: true,
-      allowDownloadTxt: true
+      allowGmail: true,
+      allowOutlook: false,
+      allowWhatsapp: true,
+      allowDownloadImage: true,
+      certificateTemplateImage: ""
     };
   } else {
+    const rs = meta.resultSharing;
     meta.resultSharing = {
-      enabled: !!meta.resultSharing.enabled,
-      email: meta.resultSharing.email ? String(meta.resultSharing.email) : "",
-      emailButtonLabel: meta.resultSharing.emailButtonLabel ? String(meta.resultSharing.emailButtonLabel) : "",
-      allowEmail: meta.resultSharing.allowEmail !== undefined ? !!meta.resultSharing.allowEmail : true,
-      allowCopy: meta.resultSharing.allowCopy !== undefined ? !!meta.resultSharing.allowCopy : true,
-      allowDownloadTxt: meta.resultSharing.allowDownloadTxt !== undefined ? !!meta.resultSharing.allowDownloadTxt : true
+      enabled: !!rs.enabled,
+      email: rs.email ? String(rs.email) : "",
+      emailButtonLabel: rs.emailButtonLabel ? String(rs.emailButtonLabel) : "",
+      allowGmail: rs.allowGmail !== undefined ? !!rs.allowGmail : (rs.allowEmail !== undefined ? !!rs.allowEmail : true),
+      allowOutlook: !!rs.allowOutlook,
+      allowWhatsapp: rs.allowWhatsapp !== undefined ? !!rs.allowWhatsapp : true,
+      allowDownloadImage: rs.allowDownloadImage !== undefined ? !!rs.allowDownloadImage : (rs.allowDownloadTxt !== undefined ? !!rs.allowDownloadTxt : true),
+      certificateTemplateImage: rs.certificateTemplateImage ? String(rs.certificateTemplateImage) : ""
     };
   }
 }
@@ -217,9 +302,11 @@ function startWithEmptyTemplate() {
         enabled: false,
         email: "",
         emailButtonLabel: "",
-        allowEmail: true,
-        allowCopy: true,
-        allowDownloadTxt: true
+        allowGmail: true,
+        allowOutlook: false,
+        allowWhatsapp: true,
+        allowDownloadImage: true,
+        certificateTemplateImage: ""
       },
       examDate: new Date().toLocaleDateString(isEn ? 'en-US' : 'tr-TR'),
       instructions: "",
@@ -415,6 +502,18 @@ function setupEventListeners() {
   safeAddListener('btn-copy-ai-prompt', 'click', copyAiPrompt);
   safeAddListener('btn-clear-bulk', 'click', clearBulkText);
   safeAddListener('bulk-import-textarea', 'input', updateBulkPreview);
+  safeAddListener('bulk-points-mode-equal', 'change', updateBulkPreview);
+  safeAddListener('bulk-points-mode-fixed', 'change', updateBulkPreview);
+  safeAddListener('bulk-target-total', 'input', () => {
+    const eqRadio = document.getElementById('bulk-points-mode-equal');
+    if (eqRadio) eqRadio.checked = true;
+    updateBulkPreview();
+  });
+  safeAddListener('bulk-fixed-points', 'input', () => {
+    const fxRadio = document.getElementById('bulk-points-mode-fixed');
+    if (fxRadio) fxRadio.checked = true;
+    updateBulkPreview();
+  });
 
   document.querySelectorAll('.btn-sample-format').forEach(btn => {
     btn.addEventListener('click', () => loadBulkSample(btn.dataset.sample));
@@ -596,9 +695,10 @@ function populateSettingsInputs() {
   setChk('setting-share-enabled', sharing.enabled);
   setVal('setting-share-email', sharing.email || '');
   setVal('setting-share-email-label', sharing.emailButtonLabel || '');
-  setChk('setting-share-allow-email', sharing.allowEmail !== false);
-  setChk('setting-share-allow-copy', sharing.allowCopy !== false);
-  setChk('setting-share-allow-download', sharing.allowDownloadTxt !== false);
+  setChk('setting-share-allow-gmail', sharing.allowGmail !== false);
+  setChk('setting-share-allow-outlook', !!sharing.allowOutlook);
+  setChk('setting-share-allow-whatsapp', sharing.allowWhatsapp !== false);
+  setChk('setting-share-allow-image', sharing.allowDownloadImage !== false);
   updateResultSharingPanelUI();
   renderParticipantFieldsEditor();
 }
@@ -608,6 +708,24 @@ function updateResultSharingPanelUI() {
   const chk = document.getElementById('setting-share-enabled');
   if (panel && chk) {
     panel.classList.toggle('is-disabled', !chk.checked);
+  }
+  const tplImg = examData && examData.meta && examData.meta.resultSharing
+    ? (examData.meta.resultSharing.certificateTemplateImage || '')
+    : '';
+  const previewWrap = document.getElementById('share-template-preview-wrap');
+  const previewImg = document.getElementById('share-template-preview-img');
+  const removeBtn = document.getElementById('btn-remove-share-template');
+  if (previewWrap && previewImg) {
+    if (tplImg) {
+      previewImg.src = tplImg;
+      previewWrap.style.display = 'block';
+    } else {
+      previewImg.src = '';
+      previewWrap.style.display = 'none';
+    }
+  }
+  if (removeBtn) {
+    removeBtn.style.display = tplImg ? 'inline-flex' : 'none';
   }
 }
 
@@ -841,9 +959,39 @@ function bindSettingsInputs() {
       saveData();
     });
   };
-  bindShareChk('setting-share-allow-email', 'allowEmail');
-  bindShareChk('setting-share-allow-copy', 'allowCopy');
-  bindShareChk('setting-share-allow-download', 'allowDownloadTxt');
+  bindShareChk('setting-share-allow-gmail', 'allowGmail');
+  bindShareChk('setting-share-allow-outlook', 'allowOutlook');
+  bindShareChk('setting-share-allow-whatsapp', 'allowWhatsapp');
+  bindShareChk('setting-share-allow-image', 'allowDownloadImage');
+
+  const tplFileEl = document.getElementById('setting-share-template-file');
+  if (tplFileEl) {
+    tplFileEl.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        ensureMetaDefaults();
+        examData.meta.resultSharing.certificateTemplateImage = ev.target.result || '';
+        updateResultSharingPanelUI();
+        saveData();
+        showToast(getLanguage() === 'en' ? 'Template image loaded.' : 'Şablon görsel yüklendi.', 'success');
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const removeTplBtn = document.getElementById('btn-remove-share-template');
+  if (removeTplBtn) {
+    removeTplBtn.addEventListener('click', () => {
+      ensureMetaDefaults();
+      examData.meta.resultSharing.certificateTemplateImage = '';
+      if (tplFileEl) tplFileEl.value = '';
+      updateResultSharingPanelUI();
+      saveData();
+      showToast(getLanguage() === 'en' ? 'Reverted to built-in template.' : 'Hazır şablona dönüldü.', 'info');
+    });
+  }
 
   populateSettingsInputs();
 }
@@ -979,7 +1127,7 @@ function renderPaper() {
           <div class="paper-question">
             <div class="paper-q-header">
               <span class="paper-q-num">${idx + 1}.</span>
-              <div class="paper-q-text"><span class="paper-q-text-body">${escapeHTML(q.text || '')}</span> <span class="paper-q-points">(${q.points || 10} ${t('q_points_short')})</span></div>
+              <div class="paper-q-text"><span class="paper-q-text-body">${escapeHTML(q.text || '')}</span> <span class="paper-q-points">(${formatPoints(getQuestionPoints(q))} ${t('q_points_short')})</span></div>
             </div>
             ${q.image ? `<img src="${q.image}" class="paper-q-image" alt="Question Image">` : ''}
             ${qBody}
@@ -1061,19 +1209,24 @@ function autoResizeAllTextareas(root = document) {
 // ==========================================
 // Soruların Editörde Render Edilmesi
 // ==========================================
+function updateTotalQuestionsBadge() {
+  const totalPoints = examData.questions.reduce((sum, q) => sum + getQuestionPoints(q), 0);
+  const badgeEl = document.getElementById('total-questions-badge');
+  const isEn = (getLanguage() === 'en');
+  if (badgeEl) {
+    badgeEl.textContent = isEn
+      ? `${examData.questions.length} Questions / ${formatPoints(totalPoints)} Pts`
+      : `${examData.questions.length} Soru / ${formatPoints(totalPoints)} Puan`;
+  }
+}
+
 function renderQuestionsList() {
   const listEl = document.getElementById('editor-questions-list');
   if (!listEl) return;
   listEl.innerHTML = '';
 
-  const totalPoints = examData.questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
-  const badgeEl = document.getElementById('total-questions-badge');
   const isEn = (getLanguage() === 'en');
-  if (badgeEl) {
-    badgeEl.textContent = isEn 
-      ? `${examData.questions.length} Questions / ${totalPoints} Pts` 
-      : `${examData.questions.length} Soru / ${totalPoints} Puan`;
-  }
+  updateTotalQuestionsBadge();
 
   examData.questions.forEach((q, idx) => {
     const isExpanded = expandedQuestionId ? (q.id === expandedQuestionId) : (idx === 0);
@@ -1135,7 +1288,7 @@ function renderQuestionsList() {
         </div>
         <div class="form-group">
           <label class="form-label">${isEn ? 'Question Points' : 'Soru Puanı'}</label>
-          <input type="number" class="form-input" value="${q.points || 10}" min="1" max="100" oninput="updateQuestionField('${q.id}', 'points', Number(this.value))">
+          <input type="number" class="form-input" value="${formatPoints(getQuestionPoints(q))}" min="0" max="10000" step="any" oninput="updateQuestionField('${q.id}', 'points', this.value === '' ? 0 : Math.max(0, Number(this.value)))">
         </div>
       </div>
 
@@ -1292,6 +1445,9 @@ function updateQuestionField(qId, field, val) {
   if (q) {
     q[field] = val;
     saveData();
+    if (field === 'points') {
+      updateTotalQuestionsBadge();
+    }
     const card = document.getElementById(`q-card-${qId}`);
     if (card && field === 'text') {
       const prevEl = card.querySelector('.q-preview-text');
@@ -1560,7 +1716,7 @@ function renderDigitalTest() {
         </div>
         <div class="nlm-q-counter">
           <span>${t('test_progress', { current: idx + 1, total })}</span>
-          <span class="brand-badge" style="margin-left:6px;">${q.points || 10} ${t('q_points_short')}</span>
+          <span class="brand-badge" style="margin-left:6px;">${formatPoints(getQuestionPoints(q))} ${t('q_points_short')}</span>
         </div>
       </div>
       <div class="nlm-header-meta-row">
@@ -1670,7 +1826,7 @@ function renderDigitalTestSummary(container) {
   const isEn = (getLanguage() === 'en');
 
   examData.questions.forEach(q => {
-    const pts = Number(q.points) || 10;
+    const pts = getQuestionPoints(q);
     maxPoints += pts;
     const ans = digitalTestState.userAnswers[q.id];
 
@@ -1689,17 +1845,22 @@ function renderDigitalTestSummary(container) {
     }
   });
 
-  const finalScore = maxPoints > 0 ? Math.round((earnedPoints / maxPoints) * 100) : 0;
+  const roundedEarned = Math.round(earnedPoints * 1000) / 1000;
+  const roundedMax = Math.round(maxPoints * 1000) / 1000;
+  const finalScorePct = roundedMax > 0 ? Math.round((roundedEarned / roundedMax) * 100) : 0;
 
-  if (finalScore >= 70 && typeof confetti === 'function') {
+  if (finalScorePct >= 70 && typeof confetti === 'function') {
     confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
   }
 
   container.innerHTML = `
     <div class="nlm-summary-card">
       <div class="nlm-score-badge-circle">
-        <span class="nlm-score-val">${finalScore}</span>
-        <span class="nlm-score-lbl">${t('test_summary_score')}</span>
+        <span class="nlm-score-val">${formatPoints(roundedEarned)}</span>
+        <span class="nlm-score-lbl">/ ${formatPoints(roundedMax)} ${t('q_points_short')}</span>
+      </div>
+      <div style="margin-bottom:0.75rem;">
+        <span class="brand-badge">${isEn ? 'Success:' : 'Başarı:'} %${finalScorePct}</span>
       </div>
       <h2 style="font-size:1.6rem; margin-bottom:0.35rem;">${t('test_summary_title')}</h2>
       <p style="color:var(--text-muted); font-size:0.92rem;">${isEn ? 'Below is your detailed performance analysis for this test.' : 'Aşağıda çözdüğünüz soruların detaylı çalışma analizini görebilirsiniz.'}</p>
@@ -2019,6 +2180,9 @@ function updateBulkPreview() {
     }
   }
 
+  const ptsDistribution = getBulkPointsDistribution(parsed.length);
+  const totalBulkPoints = Math.round(ptsDistribution.reduce((s, v) => s + v, 0) * 1000) / 1000;
+
   if (execBtn) {
     execBtn.disabled = (parsed.length === 0);
   }
@@ -2032,7 +2196,11 @@ function updateBulkPreview() {
     if (parsed.length === 0) {
       footerInfoEl.innerHTML = `<i data-lucide="info" style="width:16px; height:16px;"></i> ${t('bulk_footer_info_empty')}`;
     } else {
-      footerInfoEl.innerHTML = `<i data-lucide="check-circle" style="width:16px; height:16px; color:var(--success);"></i> <strong>${parsed.length}</strong> ${isEn ? 'questions parsed successfully.' : 'adet soru başarıyla ayrıştırıldı.'}`;
+      const firstPt = formatPoints(ptsDistribution[0]);
+      const ptsDetail = isEn
+        ? `${firstPt} pts/q • Total ${formatPoints(totalBulkPoints)} Pts`
+        : `Soru başı ${firstPt} P • Toplam ${formatPoints(totalBulkPoints)} Puan`;
+      footerInfoEl.innerHTML = `<i data-lucide="check-circle" style="width:16px; height:16px; color:var(--success);"></i> <strong>${parsed.length}</strong> ${isEn ? 'questions' : 'soru'} (${ptsDetail})`;
     }
   }
 
@@ -2050,6 +2218,7 @@ function updateBulkPreview() {
         let typeLabel = t('type_multiple');
         if (q.type === 'true_false') typeLabel = t('type_tf');
         if (q.type === 'classic') typeLabel = t('type_classic');
+        const qPtsText = `${formatPoints(ptsDistribution[idx])} ${t('q_points_short')}`;
 
         let optionsHtml = '';
         if (q.options && q.options.length > 0) {
@@ -2089,6 +2258,7 @@ function updateBulkPreview() {
                 <span class="badge" style="background:var(--primary); color:#fff; font-size:0.7rem; padding:1px 6px; border-radius:10px;">${idx + 1}</span>
                 ${isEn ? 'Question' : 'Soru'} ${idx + 1}
               </span>
+              <span class="bulk-card-pts-tag">${qPtsText}</span>
               <span class="bulk-card-type-tag">${typeLabel}</span>
             </div>
             <div class="bulk-card-title">${escapeHTML(q.text || (isEn ? '(Empty question text)' : '(Soru metni boş)'))}</div>
@@ -2760,7 +2930,11 @@ function executeBulkImport() {
     return;
   }
 
-  parsedQuestions.forEach(q => examData.questions.push(q));
+  const ptsDistribution = getBulkPointsDistribution(parsedQuestions.length);
+  parsedQuestions.forEach((q, idx) => {
+    q.points = ptsDistribution[idx];
+    examData.questions.push(q);
+  });
   saveData();
   renderQuestionsList();
   closeBulkModal();
