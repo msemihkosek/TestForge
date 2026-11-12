@@ -86,6 +86,36 @@ function ensureMetaDefaults() {
   if (!meta.testModeBehavior || !['lock_reveal', 'allow_change'].includes(meta.testModeBehavior)) {
     meta.testModeBehavior = 'lock_reveal';
   }
+  if (!Array.isArray(meta.participantFields)) {
+    meta.participantFields = [];
+  } else {
+    meta.participantFields = meta.participantFields
+      .filter(f => f && typeof f === 'object')
+      .map((f, idx) => ({
+        id: f.id ? String(f.id) : `pf-${idx + 1}`,
+        label: f.label !== undefined && f.label !== null ? String(f.label) : '',
+        required: !!f.required
+      }));
+  }
+  if (!meta.resultSharing || typeof meta.resultSharing !== 'object') {
+    meta.resultSharing = {
+      enabled: false,
+      email: "",
+      emailButtonLabel: "",
+      allowEmail: true,
+      allowCopy: true,
+      allowDownloadTxt: true
+    };
+  } else {
+    meta.resultSharing = {
+      enabled: !!meta.resultSharing.enabled,
+      email: meta.resultSharing.email ? String(meta.resultSharing.email) : "",
+      emailButtonLabel: meta.resultSharing.emailButtonLabel ? String(meta.resultSharing.emailButtonLabel) : "",
+      allowEmail: meta.resultSharing.allowEmail !== undefined ? !!meta.resultSharing.allowEmail : true,
+      allowCopy: meta.resultSharing.allowCopy !== undefined ? !!meta.resultSharing.allowCopy : true,
+      allowDownloadTxt: meta.resultSharing.allowDownloadTxt !== undefined ? !!meta.resultSharing.allowDownloadTxt : true
+    };
+  }
 }
 
 function loadInitialData() {
@@ -180,6 +210,15 @@ function startWithEmptyTemplate() {
       duration: isEn ? "40 Minutes" : "40 Dakika",
       durationMinutes: 40,
       testModeBehavior: "lock_reveal",
+      participantFields: [],
+      resultSharing: {
+        enabled: false,
+        email: "",
+        emailButtonLabel: "",
+        allowEmail: true,
+        allowCopy: true,
+        allowDownloadTxt: true
+      },
       examDate: new Date().toLocaleDateString(isEn ? 'en-US' : 'tr-TR'),
       instructions: "",
       showScoreBox: true,
@@ -547,6 +586,89 @@ function populateSettingsInputs() {
   document.querySelectorAll('input[name="test-mode-behavior"]').forEach(radio => {
     radio.checked = (radio.value === behavior);
   });
+
+  const sharing = meta.resultSharing || {};
+  setChk('setting-share-enabled', sharing.enabled);
+  setVal('setting-share-email', sharing.email || '');
+  setVal('setting-share-email-label', sharing.emailButtonLabel || '');
+  setChk('setting-share-allow-email', sharing.allowEmail !== false);
+  setChk('setting-share-allow-copy', sharing.allowCopy !== false);
+  setChk('setting-share-allow-download', sharing.allowDownloadTxt !== false);
+  updateResultSharingPanelUI();
+  renderParticipantFieldsEditor();
+}
+
+function updateResultSharingPanelUI() {
+  const panel = document.getElementById('result-sharing-options');
+  const chk = document.getElementById('setting-share-enabled');
+  if (panel && chk) {
+    panel.classList.toggle('is-disabled', !chk.checked);
+  }
+}
+
+function renderParticipantFieldsEditor() {
+  const container = document.getElementById('participant-fields-list');
+  if (!container || !examData) return;
+  ensureMetaDefaults();
+  const fields = examData.meta.participantFields || [];
+
+  if (fields.length === 0) {
+    container.innerHTML = `<div class="participant-fields-empty">${escapeHTML(t('test_prefields_empty'))}</div>`;
+    return;
+  }
+
+  container.innerHTML = fields.map((field, idx) => `
+    <div class="participant-field-row" data-pf-idx="${idx}">
+      <input type="text" class="form-input" value="${escapeHTML(field.label || '')}" placeholder="${escapeHTML(t('test_prefields_placeholder'))}" oninput="updateParticipantFieldLabel(${idx}, this.value)">
+      <label class="participant-field-req">
+        <input type="checkbox" ${field.required ? 'checked' : ''} onchange="toggleParticipantFieldRequired(${idx}, this.checked)">
+        <span>${escapeHTML(t('test_prefields_required'))}</span>
+      </label>
+      <button type="button" class="participant-field-remove" title="${escapeHTML(t('test_prefields_remove'))}" onclick="removeParticipantField(${idx})">
+        <i data-lucide="x" style="width:15px; height:15px;"></i>
+      </button>
+    </div>
+  `).join('');
+
+  lucide.createIcons();
+}
+
+function addParticipantField() {
+  if (!examData) return;
+  ensureMetaDefaults();
+  const newField = {
+    id: 'pf-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    label: '',
+    required: true
+  };
+  examData.meta.participantFields.push(newField);
+  saveData();
+  renderParticipantFieldsEditor();
+  const inputs = document.querySelectorAll('#participant-fields-list .participant-field-row .form-input');
+  if (inputs && inputs.length > 0) {
+    inputs[inputs.length - 1].focus();
+  }
+}
+
+function updateParticipantFieldLabel(idx, value) {
+  if (!examData || !examData.meta || !Array.isArray(examData.meta.participantFields)) return;
+  if (!examData.meta.participantFields[idx]) return;
+  examData.meta.participantFields[idx].label = value;
+  saveData();
+}
+
+function toggleParticipantFieldRequired(idx, checked) {
+  if (!examData || !examData.meta || !Array.isArray(examData.meta.participantFields)) return;
+  if (!examData.meta.participantFields[idx]) return;
+  examData.meta.participantFields[idx].required = !!checked;
+  saveData();
+}
+
+function removeParticipantField(idx) {
+  if (!examData || !examData.meta || !Array.isArray(examData.meta.participantFields)) return;
+  examData.meta.participantFields.splice(idx, 1);
+  saveData();
+  renderParticipantFieldsEditor();
 }
 
 function bindSettingsInputs() {
@@ -625,6 +747,52 @@ function bindSettingsInputs() {
   bindCheck('setting-show-student-info', 'showStudentInfo');
   bindCheck('setting-show-answer-key', 'showAnswerKey');
   bindCheck('setting-show-optical', 'showOpticalForm');
+
+  const addPfBtn = document.getElementById('btn-add-participant-field');
+  if (addPfBtn) {
+    addPfBtn.addEventListener('click', addParticipantField);
+  }
+
+  const shareEnabledEl = document.getElementById('setting-share-enabled');
+  if (shareEnabledEl) {
+    shareEnabledEl.addEventListener('change', (e) => {
+      ensureMetaDefaults();
+      examData.meta.resultSharing.enabled = e.target.checked;
+      updateResultSharingPanelUI();
+      saveData();
+    });
+  }
+
+  const shareEmailEl = document.getElementById('setting-share-email');
+  if (shareEmailEl) {
+    shareEmailEl.addEventListener('input', (e) => {
+      ensureMetaDefaults();
+      examData.meta.resultSharing.email = e.target.value;
+      saveData();
+    });
+  }
+
+  const shareEmailLabelEl = document.getElementById('setting-share-email-label');
+  if (shareEmailLabelEl) {
+    shareEmailLabelEl.addEventListener('input', (e) => {
+      ensureMetaDefaults();
+      examData.meta.resultSharing.emailButtonLabel = e.target.value;
+      saveData();
+    });
+  }
+
+  const bindShareChk = (id, key) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
+      ensureMetaDefaults();
+      examData.meta.resultSharing[key] = e.target.checked;
+      saveData();
+    });
+  };
+  bindShareChk('setting-share-allow-email', 'allowEmail');
+  bindShareChk('setting-share-allow-copy', 'allowCopy');
+  bindShareChk('setting-share-allow-download', 'allowDownloadTxt');
 
   populateSettingsInputs();
 }
@@ -1349,6 +1517,12 @@ function renderDigitalTest() {
         <div class="nlm-header-pills">
           <span class="nlm-mini-pill"><i data-lucide="clock" style="width:12px; height:12px;"></i> ${escapeHTML(durationLabel)}</span>
           <span class="nlm-mini-pill"><i data-lucide="${isLockedMode ? 'lock' : 'edit-3'}" style="width:12px; height:12px;"></i> ${escapeHTML(behaviorBadgeLabel)}</span>
+          ${((examData.meta && Array.isArray(examData.meta.participantFields)) ? examData.meta.participantFields.filter(f => f && f.label && f.label.trim()).length : 0) > 0
+            ? `<span class="nlm-mini-pill"><i data-lucide="user-check" style="width:12px; height:12px;"></i> ${examData.meta.participantFields.filter(f => f && f.label && f.label.trim()).length} ${isEn ? 'Pre-test field(s)' : 'Ön Bilgi Alanı'}</span>`
+            : ''}
+          ${(examData.meta && examData.meta.resultSharing && examData.meta.resultSharing.enabled)
+            ? `<span class="nlm-mini-pill"><i data-lucide="send" style="width:12px; height:12px;"></i> ${isEn ? 'Sharing On' : 'Sonuç Paylaşımı'}</span>`
+            : ''}
           <button type="button" class="nlm-settings-link-btn" onclick="switchTab('settings')">
             <i data-lucide="sliders" style="width:12px; height:12px;"></i> ${t('tab_test_settings')}
           </button>
@@ -2617,3 +2791,7 @@ window.prevDigitalQuestion = prevDigitalQuestion;
 window.nextDigitalQuestion = nextDigitalQuestion;
 window.finishDigitalTest = finishDigitalTest;
 window.restartDigitalTest = restartDigitalTest;
+window.addParticipantField = addParticipantField;
+window.updateParticipantFieldLabel = updateParticipantFieldLabel;
+window.toggleParticipantFieldRequired = toggleParticipantFieldRequired;
+window.removeParticipantField = removeParticipantField;

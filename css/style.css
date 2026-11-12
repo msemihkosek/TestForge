@@ -2190,6 +2190,110 @@ button {
   line-height: 1.4;
 }
 
+.participant-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.participant-fields-empty {
+  padding: 12px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: var(--bg-input);
+}
+
+.participant-field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.participant-field-row .form-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 0.84rem;
+  background: var(--bg-card);
+}
+
+.participant-field-req {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.participant-field-req input {
+  accent-color: var(--primary);
+}
+
+.participant-field-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all var(--trans-fast);
+}
+
+.participant-field-remove:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger);
+}
+
+.sharing-options-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-color);
+  transition: opacity var(--trans-fast);
+}
+
+.sharing-options-panel.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.sharing-checkbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.sharing-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+  line-height: 1.35;
+}
+
+.sharing-check-item input {
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+
 .nlm-topic-badge {
   font-size: 0.75rem;
   font-weight: 700;

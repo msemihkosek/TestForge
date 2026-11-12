@@ -306,6 +306,60 @@
                 </label>
               </div>
             </div>
+
+            <!-- Test Önü Bilgi Alanları (Dinamik Oluşturucu) -->
+            <div class="editor-card" id="test-participant-fields-card">
+              <div class="card-title">
+                <span><i data-lucide="user-plus" style="color:var(--primary);"></i> <span data-i18n="test_prefields_title">Test Önü Bilgi Alanları</span></span>
+                <button type="button" id="btn-add-participant-field" class="btn btn-outline btn-sm">
+                  <i data-lucide="plus"></i> <span data-i18n="test_prefields_add">Alan Ekle</span>
+                </button>
+              </div>
+              <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:10px; line-height:1.45;" data-i18n="test_prefields_desc">
+                Test başlamadan önce katılımcıdan istemek istediğiniz bilgileri (örn: Ad, Departman, Katılımcı Kodu) + butonuyla serbestçe ekleyin. Boş bırakırsanız test doğrudan başlar.
+              </p>
+              <div id="participant-fields-list" class="participant-fields-list">
+                <!-- JS ile dinamik render edilir -->
+              </div>
+            </div>
+
+            <!-- Test Bitimi Sonuç Paylaşımı / E-posta -->
+            <div class="editor-card" id="test-result-sharing-card">
+              <div class="card-title">
+                <span><i data-lucide="send" style="color:var(--success);"></i> <span data-i18n="test_sharing_title">Test Sonucu İletme &amp; Paylaşım</span></span>
+              </div>
+              <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-weight:600; font-size:0.85rem; margin-bottom:8px;">
+                <input type="checkbox" id="setting-share-enabled">
+                <span data-i18n="test_sharing_enable">Test bitiminde sonuç iletme / paylaşma seçeneklerini göster</span>
+              </label>
+              <p style="font-size:0.76rem; color:var(--text-muted); margin-bottom:10px; line-height:1.45;" data-i18n="test_sharing_desc">
+                Aktif edildiğinde, dışa aktarılan HTML testi tamamlandığında sonuçları e-posta olarak gönderme, panoya kopyalama veya metin belgesi indirme seçenekleri sunulur.
+              </p>
+              <div id="result-sharing-options" class="sharing-options-panel">
+                <div class="form-group">
+                  <label class="form-label" for="setting-share-email" data-i18n="lbl_share_email">Alıcı E-posta Adresi (İsteğe Bağlı)</label>
+                  <input type="email" id="setting-share-email" class="form-input" data-i18n-placeholder="placeholder_share_email" placeholder="Örn: sonuc@kurum.com">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="setting-share-email-label" data-i18n="lbl_share_email_btn">E-posta Buton Yazısı (İsteğe Bağlı)</label>
+                  <input type="text" id="setting-share-email-label" class="form-input" data-i18n-placeholder="placeholder_share_email_btn" placeholder="Varsayılan: Sonucu E-posta ile Gönder">
+                </div>
+                <div class="sharing-checkbox-list">
+                  <label class="sharing-check-item">
+                    <input type="checkbox" id="setting-share-allow-email" checked>
+                    <span data-i18n="chk_share_email">E-posta ile Gönder butonu (Alıcı e-posta girildiğinde görünür)</span>
+                  </label>
+                  <label class="sharing-check-item">
+                    <input type="checkbox" id="setting-share-allow-copy" checked>
+                    <span data-i18n="chk_share_copy">Sonuç Özetini Kopyala butonu</span>
+                  </label>
+                  <label class="sharing-check-item">
+                    <input type="checkbox" id="setting-share-allow-download" checked>
+                    <span data-i18n="chk_share_download">Sonuç Belgesini İndir (.txt) butonu</span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </aside>

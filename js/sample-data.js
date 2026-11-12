@@ -11,6 +11,15 @@ const SAMPLE_EXAM_DATA = {
     duration: "40 Dakika",
     durationMinutes: 40,
     testModeBehavior: "lock_reveal",
+    participantFields: [],
+    resultSharing: {
+      enabled: false,
+      email: "",
+      emailButtonLabel: "",
+      allowEmail: true,
+      allowCopy: true,
+      allowDownloadTxt: true
+    },
     examDate: "21.10.2025",
     instructions: "Sınav süresi 40 dakikadır. Çoktan seçmeli sorularda yalnızca bir doğru seçenek vardır. Yanlış cevaplar doğruları götürmez. Başarılar dileriz.",
     showScoreBox: true,

@@ -32,8 +32,30 @@ const Exporter = {
       : parseMinutes(meta.duration);
     const behavior = (meta.testModeBehavior === 'allow_change') ? 'allow_change' : 'lock_reveal';
 
+    const activeParticipantFields = Array.isArray(meta.participantFields)
+      ? meta.participantFields
+          .filter(f => f && typeof f === 'object' && f.label && String(f.label).trim())
+          .map((f, idx) => ({
+            id: f.id ? String(f.id) : `pf-${idx + 1}`,
+            label: String(f.label).trim(),
+            required: !!f.required
+          }))
+      : [];
+
+    const rawSharing = (meta.resultSharing && typeof meta.resultSharing === 'object') ? meta.resultSharing : {};
+    const resultSharingConfig = {
+      enabled: !!rawSharing.enabled,
+      email: rawSharing.email ? String(rawSharing.email).trim() : '',
+      emailButtonLabel: rawSharing.emailButtonLabel ? String(rawSharing.emailButtonLabel).trim() : '',
+      allowEmail: rawSharing.allowEmail !== false,
+      allowCopy: rawSharing.allowCopy !== false,
+      allowDownloadTxt: rawSharing.allowDownloadTxt !== false
+    };
+
     meta.durationMinutes = durationMinutes;
     meta.testModeBehavior = behavior;
+    meta.participantFields = activeParticipantFields;
+    meta.resultSharing = resultSharingConfig;
 
     const escapeBuildHtml = (str) => {
       if (str === null || str === undefined) return '';
@@ -89,7 +111,22 @@ const Exporter = {
       correctTag: '✓ Correct',
       wrongTag: '✗ Wrong',
       solutionTag: '💡 Solution / Explanation:',
-      filenameSuffix: '_interactive_quiz.html'
+      filenameSuffix: '_interactive_quiz.html',
+      participantSectionTitle: 'Participant Information',
+      participantRequiredSuffix: '*',
+      participantInputPlaceholder: 'Enter {label}...',
+      participantRequiredError: 'Please fill in the required field(s): {fields}',
+      sendEmailDefaultBtn: '✉️ Send Results via Email',
+      copySummaryBtn: '📋 Copy Result Summary',
+      copiedBtn: '✓ Copied to Clipboard',
+      downloadTxtBtn: '📄 Download Report (.txt)',
+      reportHeader: 'EXAM RESULT SUMMARY',
+      reportDateLabel: 'Completed At',
+      reportScoreLabel: 'Score',
+      reportPointsLabel: 'Points',
+      reportTimeoutNote: 'Note: Time expired and the exam was auto-submitted.',
+      reportTruncatedNote: '(Answer list was shortened due to email link limits; use Copy Summary or Download .txt for full details.)',
+      reportSuffix: '_result_summary.txt'
     } : {
       lang: 'tr',
       defaultTitle: 'İnteraktif Test',
@@ -133,7 +170,22 @@ const Exporter = {
       correctTag: '✓ Doğru',
       wrongTag: '✗ Yanlış',
       solutionTag: '💡 Çözüm/Açıklama:',
-      filenameSuffix: '_interaktif_test.html'
+      filenameSuffix: '_interaktif_test.html',
+      participantSectionTitle: 'Katılımcı Bilgileri',
+      participantRequiredSuffix: '*',
+      participantInputPlaceholder: '{label} giriniz...',
+      participantRequiredError: 'Lütfen zorunlu alanları doldurun: {fields}',
+      sendEmailDefaultBtn: '✉️ Sonucu E-posta ile Gönder',
+      copySummaryBtn: '📋 Sonuç Özetini Kopyala',
+      copiedBtn: '✓ Panoya Kopyalandı',
+      downloadTxtBtn: '📄 Sonuç Belgesi İndir (.txt)',
+      reportHeader: 'SINAV SONUÇ ÖZETİ',
+      reportDateLabel: 'Tamamlanma Tarihi',
+      reportScoreLabel: 'Başarı Puanı',
+      reportPointsLabel: 'Alınan Puan',
+      reportTimeoutNote: 'Not: Süre dolduğu için sınav otomatik olarak sonlandırılmıştır.',
+      reportTruncatedNote: '(E-posta bağlantı sınırı nedeniyle yanıt listesi kısaltıldı; tam detay için Özet Kopyala veya .txt İndir butonunu kullanabilirsiniz.)',
+      reportSuffix: '_sonuc_ozeti.txt'
     };
 
     const resolvedTitle = (meta.title && String(meta.title).trim()) ? String(meta.title).trim() : ui.defaultTitle;
@@ -304,6 +356,95 @@ const Exporter = {
       border-radius: 12px;
       font-weight: 700;
       margin-bottom: 1.5rem;
+    }
+    .participant-form-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.35rem;
+      text-align: left;
+      margin-bottom: 1.5rem;
+    }
+    .participant-form-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.9rem;
+      color: var(--text);
+    }
+    .participant-fields-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+    .participant-field-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .participant-field-item label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .req-star {
+      color: var(--danger);
+      margin-left: 2px;
+      font-weight: 800;
+    }
+    .participant-input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      background: var(--card-bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.96rem;
+      transition: border-color 0.2s;
+    }
+    .participant-input:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    .participant-input.is-invalid {
+      border-color: var(--danger);
+      background: rgba(239, 68, 68, 0.05);
+    }
+    .participant-error-msg {
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 0.86rem;
+      font-weight: 600;
+    }
+    .participant-summary-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin: 1rem 0 0.5rem;
+    }
+    .participant-summary-pill {
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: 0.88rem;
+      color: var(--text);
+    }
+    .result-actions-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 1.5rem 0;
+    }
+    .btn-outline {
+      background: var(--card-bg);
+      color: var(--primary);
+      border: 2px solid var(--primary);
+    }
+    .btn-outline:not(:disabled):hover {
+      background: var(--primary-light);
     }
     .progress-bar-container {
       background: var(--border);
@@ -801,6 +942,20 @@ const Exporter = {
       <div class="start-rule-box">
         <strong>${escapeBuildHtml(modeSummaryTitle)}:</strong> ${escapeBuildHtml(modeSummaryDesc)}
       </div>
+      ${activeParticipantFields.length > 0 ? `
+        <div class="participant-form-box" id="participant-form-box">
+          <div class="participant-form-title">${escapeBuildHtml(ui.participantSectionTitle)}</div>
+          <div class="participant-fields-grid">
+            ${activeParticipantFields.map((f, i) => `
+              <div class="participant-field-item">
+                <label for="pf-input-${i}">${escapeBuildHtml(f.label)}${f.required ? `<span class="req-star">${escapeBuildHtml(ui.participantRequiredSuffix)}</span>` : ''}</label>
+                <input type="text" id="pf-input-${i}" class="participant-input" placeholder="${escapeBuildHtml(ui.participantInputPlaceholder.replace('{label}', f.label))}" oninput="clearParticipantFieldError(${i})">
+              </div>
+            `).join('')}
+          </div>
+          <div id="participant-form-error" class="participant-error-msg" style="display: none;"></div>
+        </div>
+      ` : ''}
       ${safeExamData.questions.length > 0
         ? `<button type="button" class="btn btn-primary" id="btn-start-exam" style="padding:16px 38px; font-size:1.1rem;" onclick="startExam()">${escapeBuildHtml(ui.startBtn)}</button>`
         : `<p style="color:var(--danger); font-weight:700;">${escapeBuildHtml(ui.noQuestionsWarning)}</p>`
@@ -830,11 +985,17 @@ const Exporter = {
     const ui = ${JSON.stringify(ui)};
     const examConfig = {
       durationMinutes: ${durationMinutes},
-      behavior: ${JSON.stringify(behavior)}
+      behavior: ${JSON.stringify(behavior)},
+      participantFields: ${JSON.stringify(activeParticipantFields)},
+      resultSharing: ${JSON.stringify(resultSharingConfig)},
+      resolvedTitle: ${JSON.stringify(resolvedTitle)},
+      resolvedCourse: ${JSON.stringify(resolvedCourse)}
     };
     let currentIndex = 0;
     let userAnswers = {};
     let revealed = {};
+    let participantValues = {};
+    let lastResultStats = null;
     let isFinished = false;
     let hasStarted = false;
     let timerInterval = null;
@@ -904,6 +1065,55 @@ const Exporter = {
       }
     }
 
+    function clearParticipantFieldError(idx) {
+      const inp = document.getElementById('pf-input-' + idx);
+      if (inp) inp.classList.remove('is-invalid');
+      const errEl = document.getElementById('participant-form-error');
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+    }
+
+    function validateAndCollectParticipantInfo() {
+      const fields = examConfig.participantFields || [];
+      const collected = {};
+      const missing = [];
+      let firstInvalidInput = null;
+
+      fields.forEach((f, idx) => {
+        const inp = document.getElementById('pf-input-' + idx);
+        const val = inp ? String(inp.value || '').trim() : '';
+        if (inp) inp.classList.remove('is-invalid');
+        if (f.required && !val) {
+          missing.push(f.label);
+          if (inp) {
+            inp.classList.add('is-invalid');
+            if (!firstInvalidInput) firstInvalidInput = inp;
+          }
+        }
+        collected[f.id] = val;
+      });
+
+      const errEl = document.getElementById('participant-form-error');
+      if (missing.length > 0) {
+        if (errEl) {
+          errEl.textContent = ui.participantRequiredError.replace('{fields}', missing.join(', '));
+          errEl.style.display = 'block';
+        }
+        if (firstInvalidInput && typeof firstInvalidInput.focus === 'function') {
+          firstInvalidInput.focus();
+        }
+        return null;
+      }
+
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+      return collected;
+    }
+
     function init() {
       stopTimer();
       hasStarted = false;
@@ -911,7 +1121,19 @@ const Exporter = {
       currentIndex = 0;
       userAnswers = {};
       revealed = {};
+      participantValues = {};
+      lastResultStats = null;
       endTimestamp = null;
+
+      (examConfig.participantFields || []).forEach((f, idx) => {
+        const inp = document.getElementById('pf-input-' + idx);
+        if (inp) inp.classList.remove('is-invalid');
+      });
+      const errEl = document.getElementById('participant-form-error');
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
 
       const startEl = document.getElementById('start-screen');
       const quizEl = document.getElementById('quiz-container');
@@ -930,12 +1152,18 @@ const Exporter = {
 
     function startExam() {
       if (!exam.questions || exam.questions.length === 0) return;
+
+      const collected = validateAndCollectParticipantInfo();
+      if (collected === null) return;
+
       stopTimer();
+      participantValues = collected;
       hasStarted = true;
       isFinished = false;
       currentIndex = 0;
       userAnswers = {};
       revealed = {};
+      lastResultStats = null;
 
       const startEl = document.getElementById('start-screen');
       const quizEl = document.getElementById('quiz-container');
@@ -1082,6 +1310,146 @@ const Exporter = {
       if (currentIndex < exam.questions.length - 1) showQuestion(currentIndex + 1);
     }
 
+    function getParticipantEntries() {
+      return (examConfig.participantFields || [])
+        .map(f => ({ label: f.label, value: participantValues[f.id] || '' }))
+        .filter(item => item.value !== '');
+    }
+
+    function buildResultSummaryText(compact = false) {
+      const stats = lastResultStats || {
+        scorePct: 0,
+        totalEarnedPoints: 0,
+        maxTotalPoints: 0,
+        correctCount: 0,
+        wrongCount: 0,
+        emptyCount: 0,
+        isAutoTimeout: false,
+        completedAt: new Date().toLocaleString()
+      };
+      const lines = [];
+      lines.push('=== ' + ui.reportHeader + ' ===');
+      lines.push(examConfig.resolvedTitle + ' (' + examConfig.resolvedCourse + ')');
+      lines.push(ui.reportDateLabel + ': ' + stats.completedAt);
+
+      const entries = getParticipantEntries();
+      if (entries.length > 0) {
+        lines.push('');
+        lines.push('--- ' + ui.participantSectionTitle + ' ---');
+        entries.forEach(item => lines.push(item.label + ': ' + item.value));
+      }
+
+      lines.push('');
+      lines.push(ui.reportScoreLabel + ': ' + stats.scorePct + ' / 100 (' + stats.totalEarnedPoints + '/' + stats.maxTotalPoints + ' ' + ui.pointsWord + ')');
+      lines.push(ui.correctLabel + ': ' + stats.correctCount + ' | ' + ui.wrongLabel + ': ' + stats.wrongCount + ' | ' + ui.emptyLabel + ': ' + stats.emptyCount);
+      if (stats.isAutoTimeout) {
+        lines.push(ui.reportTimeoutNote);
+      }
+
+      lines.push('');
+      if (compact) {
+        const compactItems = exam.questions.map((q, idx) => {
+          const ans = userAnswers[q.id];
+          const hasAns = !!(ans && String(ans).trim());
+          if (!hasAns) return (idx + 1) + ':-';
+          if (q.type === 'classic') return (idx + 1) + ':' + String(ans).trim().slice(0, 30);
+          return (idx + 1) + ':' + ans + (ans === q.correctAnswer ? '(+)' : '(-/' + (q.correctAnswer || '') + ')');
+        });
+        lines.push(compactItems.join('  '));
+      } else {
+        exam.questions.forEach((q, idx) => {
+          const ans = userAnswers[q.id];
+          const hasAns = !!(ans && String(ans).trim());
+          const status = q.type === 'classic'
+            ? ''
+            : (!hasAns
+                ? ' (' + ui.leftBlank + ', ' + ui.correctLabel + ': ' + (q.correctAnswer || '-') + ')'
+                : (ans === q.correctAnswer ? ' (' + ui.correctTag + ')' : ' (' + ui.wrongTag + ', ' + ui.correctLabel + ': ' + (q.correctAnswer || '-') + ')'));
+          lines.push((idx + 1) + '. ' + (hasAns ? String(ans).trim() : ui.leftBlank) + status);
+        });
+      }
+      return lines.join('\\n');
+    }
+
+    function buildMailtoHref() {
+      const sharing = examConfig.resultSharing || {};
+      const to = encodeURIComponent(sharing.email || '');
+      const entries = getParticipantEntries();
+      const firstVal = entries.length > 0 ? entries[0].value : '';
+      const subjectText = firstVal
+        ? (examConfig.resolvedTitle + ' - ' + firstVal)
+        : (examConfig.resolvedTitle + ' - ' + ui.reportHeader);
+      const subject = encodeURIComponent(subjectText);
+
+      let bodyText = buildResultSummaryText(false);
+      let body = encodeURIComponent(bodyText);
+      if (body.length > 1500) {
+        bodyText = buildResultSummaryText(true) + '\\n\\n' + ui.reportTruncatedNote;
+        body = encodeURIComponent(bodyText);
+        if (body.length > 1700) {
+          bodyText = bodyText.slice(0, 900) + '...\\n' + ui.reportTruncatedNote;
+          body = encodeURIComponent(bodyText);
+        }
+      }
+      return 'mailto:' + to + '?subject=' + subject + '&body=' + body;
+    }
+
+    function sendResultByEmail() {
+      const href = buildMailtoHref();
+      window.location.href = href;
+    }
+
+    function copyResultSummary(btnEl) {
+      const text = buildResultSummaryText(false);
+      const markCopied = () => {
+        if (!btnEl) return;
+        const orig = btnEl.getAttribute('data-orig-label') || btnEl.textContent;
+        btnEl.setAttribute('data-orig-label', orig);
+        btnEl.textContent = ui.copiedBtn;
+        setTimeout(() => {
+          btnEl.textContent = orig;
+        }, 2000);
+      };
+
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(text).then(markCopied).catch(() => {
+          fallbackCopySummary(text);
+          markCopied();
+        });
+      } else {
+        fallbackCopySummary(text);
+        markCopied();
+      }
+    }
+
+    function fallbackCopySummary(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+
+    function downloadResultTxt() {
+      const text = buildResultSummaryText(false);
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const entries = getParticipantEntries();
+      const firstVal = entries.length > 0 ? ('_' + entries[0].value) : '';
+      const rawName = (examConfig.resolvedTitle + firstVal).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'test';
+      a.download = rawName + ui.reportSuffix;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
     function finishExam(isAutoTimeout = false) {
       if (!hasStarted || isFinished) return;
 
@@ -1134,8 +1502,41 @@ const Exporter = {
       });
 
       const scorePct = maxTotalPoints > 0 ? Math.round((totalEarnedPoints / maxTotalPoints) * 100) : 0;
+      lastResultStats = {
+        scorePct,
+        totalEarnedPoints,
+        maxTotalPoints,
+        correctCount,
+        wrongCount,
+        emptyCount,
+        isAutoTimeout,
+        completedAt: new Date().toLocaleString(ui.lang === 'en' ? 'en-US' : 'tr-TR')
+      };
+
       if (scorePct >= 70 && typeof confetti === 'function') {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+      }
+
+      const participantEntries = getParticipantEntries();
+      const participantSummaryHtml = participantEntries.length > 0
+        ? '<div class="participant-summary-grid">' + participantEntries.map(item =>
+            '<span class="participant-summary-pill"><strong>' + escapeHtml(item.label) + ':</strong> ' + escapeHtml(item.value) + '</span>'
+          ).join('') + '</div>'
+        : '';
+
+      const sharing = examConfig.resultSharing || {};
+      let sharingButtonsHtml = '';
+      if (sharing.enabled) {
+        const emailBtnText = sharing.emailButtonLabel ? sharing.emailButtonLabel : ui.sendEmailDefaultBtn;
+        if (sharing.allowEmail && sharing.email) {
+          sharingButtonsHtml += \`<button type="button" class="btn btn-success" id="btn-send-email" onclick="sendResultByEmail()">\${escapeHtml(emailBtnText)}</button>\`;
+        }
+        if (sharing.allowCopy) {
+          sharingButtonsHtml += \`<button type="button" class="btn btn-outline" id="btn-copy-summary" onclick="copyResultSummary(this)">\${escapeHtml(ui.copySummaryBtn)}</button>\`;
+        }
+        if (sharing.allowDownloadTxt) {
+          sharingButtonsHtml += \`<button type="button" class="btn btn-secondary" id="btn-download-txt" onclick="downloadResultTxt()">\${escapeHtml(ui.downloadTxtBtn)}</button>\`;
+        }
       }
 
       const resDiv = document.getElementById('result-container');
@@ -1147,12 +1548,14 @@ const Exporter = {
           <div style="font-size: 0.8rem; font-weight:600;">\${escapeHtml(ui.scoreLabel)}</div>
         </div>
         <h2>\${escapeHtml(ui.congratsTitle)}</h2>
+        \${participantSummaryHtml}
         <div class="stats-row">
           <div class="stat-item"><div style="color:var(--success); font-size:1.5rem; font-weight:800;">\${correctCount}</div><div>\${escapeHtml(ui.correctLabel)}</div></div>
           <div class="stat-item"><div style="color:var(--danger); font-size:1.5rem; font-weight:800;">\${wrongCount}</div><div>\${escapeHtml(ui.wrongLabel)}</div></div>
           <div class="stat-item"><div style="color:var(--text-muted); font-size:1.5rem; font-weight:800;">\${emptyCount}</div><div>\${escapeHtml(ui.emptyLabel)}</div></div>
         </div>
-        <div style="margin: 1.5rem 0;">
+        <div class="result-actions-bar">
+          \${sharingButtonsHtml}
           <button type="button" class="btn btn-primary" onclick="restartExam()">\${escapeHtml(ui.restartBtn)}</button>
         </div>
         <h3 style="text-align:left; margin-top:2rem; margin-bottom:1rem;">\${escapeHtml(ui.reviewHeading)}</h3>
