@@ -50,6 +50,8 @@ function setupLanguageListener() {
     }
 
     renderQuestionsList();
+    updateSettingsModeUI();
+    populateSettingsInputs();
     if (currentView === 'workspace') {
       if (appMode === 'paper') {
         renderPaper();
@@ -60,6 +62,30 @@ function setupLanguageListener() {
     updateBulkPreview();
     lucide.createIcons();
   });
+}
+
+function parseDurationMinutesFromText(durationText) {
+  if (durationText === null || durationText === undefined) return 0;
+  const raw = String(durationText).trim();
+  if (!raw || /süresiz|untimed|yok|none/i.test(raw)) return 0;
+  const m = raw.match(/(\d+)/);
+  if (!m) return 0;
+  const val = parseInt(m[1], 10);
+  return Number.isFinite(val) && val > 0 ? Math.min(val, 600) : 0;
+}
+
+function ensureMetaDefaults() {
+  if (!examData) return;
+  if (!examData.meta) examData.meta = {};
+  const meta = examData.meta;
+  if (meta.durationMinutes === undefined || meta.durationMinutes === null || Number.isNaN(Number(meta.durationMinutes))) {
+    meta.durationMinutes = parseDurationMinutesFromText(meta.duration);
+  } else {
+    meta.durationMinutes = Math.max(0, Math.min(600, Math.floor(Number(meta.durationMinutes))));
+  }
+  if (!meta.testModeBehavior || !['lock_reveal', 'allow_change'].includes(meta.testModeBehavior)) {
+    meta.testModeBehavior = 'lock_reveal';
+  }
 }
 
 function loadInitialData() {
@@ -73,6 +99,7 @@ function loadInitialData() {
   } else {
     examData = JSON.parse(JSON.stringify(SAMPLE_EXAM_DATA));
   }
+  ensureMetaDefaults();
 }
 
 function saveData() {
@@ -147,10 +174,12 @@ function startWithEmptyTemplate() {
       institution: "",
       title: (pendingSelectedMode === 'paper') 
         ? (isEn ? "EXAMINATION PAPER" : "YAZILI DEĞERLENDİRME SINAVI") 
-        : (isEn ? "GENERAL ASSESSMENT QUIZ" : "GENEL DEĞERLENDİRME TESTİ"),
+        : "",
       course: "",
       classGrade: "",
       duration: isEn ? "40 Minutes" : "40 Dakika",
+      durationMinutes: 40,
+      testModeBehavior: "lock_reveal",
       examDate: new Date().toLocaleDateString(isEn ? 'en-US' : 'tr-TR'),
       instructions: "",
       showScoreBox: true,
@@ -162,6 +191,7 @@ function startWithEmptyTemplate() {
     questions: []
   };
   expandedQuestionId = null;
+  digitalTestState = { activeIdx: 0, userAnswers: {}, revealed: {}, isFinished: false };
   saveData();
   closeTemplateChoiceModal();
   selectAppMode(pendingSelectedMode);
@@ -174,11 +204,26 @@ function startWithEmptyTemplate() {
 function startWithSampleTemplate() {
   const isEn = (getLanguage() === 'en');
   examData = JSON.parse(JSON.stringify(SAMPLE_EXAM_DATA));
+  ensureMetaDefaults();
   expandedQuestionId = (examData.questions && examData.questions.length > 0) ? examData.questions[0].id : null;
+  digitalTestState = { activeIdx: 0, userAnswers: {}, revealed: {}, isFinished: false };
   saveData();
   closeTemplateChoiceModal();
   selectAppMode(pendingSelectedMode);
   showToast(isEn ? 'Sample exam loaded. Edit as you wish.' : 'Örnek sınav yüklendi. İstediğiniz gibi düzenleyebilirsiniz.', 'success');
+}
+
+function updateSettingsModeUI() {
+  const paperSections = document.getElementById('paper-settings-sections');
+  const testSections = document.getElementById('test-settings-sections');
+  const settingsTabLabel = document.getElementById('tab-settings-label');
+  const isPaper = (appMode === 'paper');
+
+  if (paperSections) paperSections.style.display = isPaper ? 'flex' : 'none';
+  if (testSections) testSections.style.display = isPaper ? 'none' : 'flex';
+  if (settingsTabLabel) {
+    settingsTabLabel.textContent = isPaper ? t('tab_settings') : t('tab_test_settings');
+  }
 }
 
 /**
@@ -187,6 +232,7 @@ function startWithSampleTemplate() {
 function selectAppMode(mode) {
   appMode = mode;
   currentView = 'workspace';
+  ensureMetaDefaults();
 
   const landingEl = document.getElementById('landing-view');
   const workspaceEl = document.getElementById('workspace-view');
@@ -206,14 +252,16 @@ function selectAppMode(mode) {
   const tabsBar = document.getElementById('editor-tabs-bar');
   const isEn = (getLanguage() === 'en');
 
+  if (tabsBar) tabsBar.style.display = 'flex';
+  updateSettingsModeUI();
+  populateSettingsInputs();
+
   if (mode === 'paper') {
     // Sınav Kağıdı Modu
     if (btnPdf) btnPdf.style.display = 'inline-flex';
     if (btnPrint) btnPrint.style.display = 'inline-flex';
     if (btnHtml) btnHtml.style.display = 'none';
 
-    // Üst ayarlar sekmesini göster
-    if (tabsBar) tabsBar.style.display = 'flex';
     if (paperEl) paperEl.style.display = 'flex';
     if (digitalEl) digitalEl.style.display = 'none';
 
@@ -234,8 +282,6 @@ function selectAppMode(mode) {
     if (btnPrint) btnPrint.style.display = 'none';
     if (btnHtml) btnHtml.style.display = 'inline-flex';
 
-    // Okul/kurum gibi sınav ayarları sekmesini gizle
-    if (tabsBar) tabsBar.style.display = 'none';
     switchTab('questions');
 
     if (paperEl) paperEl.style.display = 'none';
@@ -402,7 +448,10 @@ function switchTab(tab) {
   if (tabQBtn) tabQBtn.classList.toggle('active', tab === 'questions');
   if (tabSBtn) tabSBtn.classList.toggle('active', tab === 'settings');
 
-  if (viewQ) viewQ.style.display = (tab === 'questions') ? 'block' : 'none';
+  if (viewQ) {
+    viewQ.style.display = (tab === 'questions') ? 'block' : 'none';
+    if (tab === 'questions') autoResizeAllTextareas(viewQ);
+  }
   if (viewS) viewS.style.display = (tab === 'settings') ? 'block' : 'none';
 }
 
@@ -464,13 +513,54 @@ function updateLayoutToggleBtn() {
 // ==========================================
 // Ayarlar Formu Bağlama (Settings Bindings)
 // ==========================================
+function populateSettingsInputs() {
+  if (!examData) return;
+  ensureMetaDefaults();
+  const meta = examData.meta || {};
+
+  const setVal = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.value = val !== undefined && val !== null ? val : '';
+  };
+  const setChk = (id, val) => {
+    const el = document.getElementById(id);
+    if (el) el.checked = !!val;
+  };
+
+  setVal('setting-institution', meta.institution || '');
+  setVal('setting-title', meta.title || '');
+  setVal('setting-test-title', meta.title || '');
+  setVal('setting-course', meta.course || '');
+  setVal('setting-test-course', meta.course || '');
+  setVal('setting-grade', meta.classGrade || '');
+  setVal('setting-duration', meta.duration || '');
+  setVal('setting-test-duration-minutes', meta.durationMinutes || 0);
+  setVal('setting-date', meta.examDate || '');
+  setVal('setting-instructions', meta.instructions || '');
+
+  setChk('setting-show-score', meta.showScoreBox);
+  setChk('setting-show-student-info', meta.showStudentInfo);
+  setChk('setting-show-answer-key', meta.showAnswerKey);
+  setChk('setting-show-optical', meta.showOpticalForm);
+
+  const behavior = meta.testModeBehavior || 'lock_reveal';
+  document.querySelectorAll('input[name="test-mode-behavior"]').forEach(radio => {
+    radio.checked = (radio.value === behavior);
+  });
+}
+
 function bindSettingsInputs() {
-  const bindText = (id, prop) => {
+  const bindText = (id, prop, mirrorId = null) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.value = examData.meta[prop] || '';
     el.addEventListener('input', (e) => {
       examData.meta[prop] = e.target.value;
+      if (mirrorId) {
+        const mirror = document.getElementById(mirrorId);
+        if (mirror && mirror.value !== e.target.value) {
+          mirror.value = e.target.value;
+        }
+      }
       saveData();
     });
   };
@@ -478,7 +568,6 @@ function bindSettingsInputs() {
   const bindCheck = (id, prop) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.checked = !!examData.meta[prop];
     el.addEventListener('change', (e) => {
       examData.meta[prop] = e.target.checked;
       saveData();
@@ -486,17 +575,58 @@ function bindSettingsInputs() {
   };
 
   bindText('setting-institution', 'institution');
-  bindText('setting-title', 'title');
-  bindText('setting-course', 'course');
+  bindText('setting-title', 'title', 'setting-test-title');
+  bindText('setting-test-title', 'title', 'setting-title');
+  bindText('setting-course', 'course', 'setting-test-course');
+  bindText('setting-test-course', 'course', 'setting-course');
   bindText('setting-grade', 'classGrade');
-  bindText('setting-duration', 'duration');
   bindText('setting-date', 'examDate');
   bindText('setting-instructions', 'instructions');
+
+  const paperDurationEl = document.getElementById('setting-duration');
+  if (paperDurationEl) {
+    paperDurationEl.addEventListener('input', (e) => {
+      examData.meta.duration = e.target.value;
+      const mins = parseDurationMinutesFromText(e.target.value);
+      examData.meta.durationMinutes = mins;
+      const testDurEl = document.getElementById('setting-test-duration-minutes');
+      if (testDurEl) testDurEl.value = mins;
+      saveData();
+    });
+  }
+
+  const testDurationEl = document.getElementById('setting-test-duration-minutes');
+  if (testDurationEl) {
+    testDurationEl.addEventListener('input', (e) => {
+      const raw = parseInt(e.target.value, 10);
+      const mins = (Number.isFinite(raw) && raw > 0) ? Math.min(raw, 600) : 0;
+      examData.meta.durationMinutes = mins;
+      const isEn = (getLanguage() === 'en');
+      examData.meta.duration = mins > 0
+        ? `${mins} ${isEn ? 'Minutes' : 'Dakika'}`
+        : (isEn ? 'Untimed' : 'Süresiz');
+      if (paperDurationEl) paperDurationEl.value = examData.meta.duration;
+      saveData();
+    });
+  }
+
+  document.querySelectorAll('input[name="test-mode-behavior"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      if (!e.target.checked) return;
+      examData.meta.testModeBehavior = e.target.value;
+      digitalTestState.userAnswers = {};
+      digitalTestState.revealed = {};
+      digitalTestState.isFinished = false;
+      saveData();
+    });
+  });
 
   bindCheck('setting-show-score', 'showScoreBox');
   bindCheck('setting-show-student-info', 'showStudentInfo');
   bindCheck('setting-show-answer-key', 'showAnswerKey');
   bindCheck('setting-show-optical', 'showOpticalForm');
+
+  populateSettingsInputs();
 }
 
 // ==========================================
@@ -630,10 +760,7 @@ function renderPaper() {
           <div class="paper-question">
             <div class="paper-q-header">
               <span class="paper-q-num">${idx + 1}.</span>
-              <div class="paper-q-text">
-                ${escapeHTML(q.text || '')}
-                <span class="paper-q-points">(${q.points || 10} ${t('q_points_short')})</span>
-              </div>
+              <div class="paper-q-text"><span class="paper-q-text-body">${escapeHTML(q.text || '')}</span> <span class="paper-q-points">(${q.points || 10} ${t('q_points_short')})</span></div>
             </div>
             ${q.image ? `<img src="${q.image}" class="paper-q-image" alt="Question Image">` : ''}
             ${qBody}
@@ -696,6 +823,22 @@ function renderPaper() {
   paper.innerHTML = headerHtml + questionsHtml + opticalHtml + answerKeyHtml + footerHtml;
 }
 
+function autoResizeTextarea(el, maxHeight = 360) {
+  if (!el) return;
+  el.style.height = 'auto';
+  const nextHeight = Math.min(el.scrollHeight, maxHeight);
+  el.style.height = nextHeight + 'px';
+  el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+}
+
+function autoResizeAllTextareas(root = document) {
+  if (!root) return;
+  root.querySelectorAll('textarea.auto-grow-textarea').forEach(ta => {
+    const maxH = Number(ta.dataset.maxHeight) || 360;
+    autoResizeTextarea(ta, maxH);
+  });
+}
+
 // ==========================================
 // Soruların Editörde Render Edilmesi
 // ==========================================
@@ -722,10 +865,11 @@ function renderQuestionsList() {
     // Header bar
     const headerEl = document.createElement('div');
     headerEl.className = 'question-header';
+    const previewTitleText = q.text || (isEn ? '(Question text empty)' : '(Soru metni boş)');
     headerEl.innerHTML = `
-      <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1;">
+      <div style="display:flex; align-items:center; gap:8px; overflow:hidden; flex:1; min-width:0;">
         <span class="q-badge">${idx + 1}</span>
-        <span class="q-preview-text">${escapeHTML(q.text || (isEn ? '(Question text empty)' : '(Soru metni boş)'))}</span>
+        <span class="q-preview-text" title="${escapeHTML(previewTitleText)}">${escapeHTML(previewTitleText)}</span>
       </div>
       <div class="q-actions" onclick="event.stopPropagation()">
         <button class="btn btn-icon btn-sm" title="${t('btn_up_tooltip')}" onclick="moveQuestion(${idx}, -1)" ${idx === 0 ? 'disabled' : ''}>
@@ -749,6 +893,7 @@ function renderQuestionsList() {
       if (!isCurrentlyExpanded) {
         itemEl.classList.add('expanded', 'active');
         expandedQuestionId = q.id;
+        autoResizeAllTextareas(itemEl);
       } else {
         expandedQuestionId = null;
       }
@@ -777,7 +922,7 @@ function renderQuestionsList() {
 
       <div class="form-group">
         <label class="form-label">${isEn ? 'Question Text' : 'Soru Metni'}</label>
-        <textarea class="form-textarea" rows="3" placeholder="${t('q_text_placeholder')}" oninput="updateQuestionField('${q.id}', 'text', this.value)">${escapeHTML(q.text || '')}</textarea>
+        <textarea class="form-textarea auto-grow-textarea" data-max-height="360" rows="3" placeholder="${t('q_text_placeholder')}" oninput="updateQuestionField('${q.id}', 'text', this.value); autoResizeTextarea(this, 360)">${escapeHTML(q.text || '')}</textarea>
       </div>
 
       <!-- Resim Ekleme Alanı -->
@@ -805,7 +950,7 @@ function renderQuestionsList() {
 
       <div class="form-group">
         <label class="form-label">${t('q_explanation_label')}</label>
-        <input type="text" class="form-input" placeholder="${isEn ? 'Explanation or hint for this question...' : 'Bu sorunun açıklaması veya çözüm adımı...'}" value="${escapeHTML(q.explanation || '')}" oninput="updateQuestionField('${q.id}', 'explanation', this.value)">
+        <textarea class="form-textarea auto-grow-textarea" data-max-height="180" rows="1" placeholder="${isEn ? 'Explanation or hint for this question...' : 'Bu sorunun açıklaması veya çözüm adımı...'}" oninput="updateQuestionField('${q.id}', 'explanation', this.value); autoResizeTextarea(this, 180)">${escapeHTML(q.explanation || '')}</textarea>
       </div>
     `;
 
@@ -816,6 +961,7 @@ function renderQuestionsList() {
     renderQuestionOptionsEditor(q);
   });
 
+  autoResizeAllTextareas(listEl);
   lucide.createIcons();
 }
 
@@ -843,7 +989,7 @@ function renderQuestionOptionsEditor(q) {
                 <button class="option-letter-btn ${isCorrect ? 'correct' : ''}" title="${isEn ? 'Mark as Correct Answer' : 'Doğru Cevap Olarak İşaretle'}" onclick="setCorrectOption('${q.id}', '${opt.letter}')">
                   ${opt.letter}
                 </button>
-                <input type="text" class="form-input option-input" value="${escapeHTML(opt.text || '')}" placeholder="${isEn ? `Option ${opt.letter} text...` : `${opt.letter} seçeneği metni...`}" oninput="updateOptionText('${q.id}', ${optIdx}, this.value)">
+                <textarea rows="1" class="form-input option-input auto-grow-textarea" data-max-height="160" placeholder="${isEn ? `Option ${opt.letter} text...` : `${opt.letter} seçeneği metni...`}" oninput="updateOptionText('${q.id}', ${optIdx}, this.value); autoResizeTextarea(this, 160)">${escapeHTML(opt.text || '')}</textarea>
                 ${q.type === 'multiple' && q.options.length > 2 ? `
                   <button class="btn-icon option-remove-btn" title="${isEn ? 'Remove Option' : 'Şıkkı Kaldır'}" onclick="removeOptionFromQuestion('${q.id}', ${optIdx})">
                     <i data-lucide="x"></i>
@@ -864,12 +1010,13 @@ function renderQuestionOptionsEditor(q) {
         </div>
         <div class="form-group">
           <label class="form-label">${t('q_classic_answer_label')}</label>
-          <input type="text" class="form-input" placeholder="${isEn ? 'Text shown in answer key' : 'Cevap anahtarında görünecek metin'}" value="${escapeHTML(q.correctAnswer || '')}" oninput="updateQuestionField('${q.id}', 'correctAnswer', this.value)">
+          <textarea rows="1" class="form-input auto-grow-textarea" data-max-height="160" placeholder="${isEn ? 'Text shown in answer key' : 'Cevap anahtarında görünecek metin'}" oninput="updateQuestionField('${q.id}', 'correctAnswer', this.value); autoResizeTextarea(this, 160)">${escapeHTML(q.correctAnswer || '')}</textarea>
         </div>
       </div>
     `;
   }
 
+  autoResizeAllTextareas(container);
   lucide.createIcons();
 }
 
@@ -929,7 +1076,10 @@ function updateQuestionField(qId, field, val) {
     const card = document.getElementById(`q-card-${qId}`);
     if (card && field === 'text') {
       const prevEl = card.querySelector('.q-preview-text');
-      if (prevEl) prevEl.textContent = val || '(Soru metni boş)';
+      if (prevEl) {
+        prevEl.textContent = val || '(Soru metni boş)';
+        prevEl.title = val || '';
+      }
     }
   }
 }
@@ -1104,8 +1254,21 @@ function renderDigitalTest() {
   const idx = digitalTestState.activeIdx;
   const q = examData.questions[idx];
   const progressPct = Math.round(((idx + 1) / total) * 100);
-  const isRevealed = !!digitalTestState.revealed[q.id];
+  const behavior = (examData.meta && examData.meta.testModeBehavior === 'allow_change') ? 'allow_change' : 'lock_reveal';
+  const isLockedMode = (behavior === 'lock_reveal');
+  const isRevealed = isLockedMode && !!digitalTestState.revealed[q.id];
   const userAns = digitalTestState.userAnswers[q.id];
+  const durationMins = (examData.meta && Number(examData.meta.durationMinutes) > 0) ? Number(examData.meta.durationMinutes) : 0;
+  const durationLabel = durationMins > 0 ? `${durationMins} ${t('test_minutes_short')}` : t('test_untimed');
+  const behaviorBadgeLabel = isLockedMode
+    ? (isEn ? 'Locked • Instant Feedback' : 'Kilitli • Anında Sonuç')
+    : (isEn ? 'Editable • End Results' : 'Değiştirilebilir • Sonuç Bitimde');
+  const testTitleText = (examData.meta && examData.meta.title && examData.meta.title.trim())
+    ? examData.meta.title.trim()
+    : (isEn ? 'Interactive Quiz' : 'İnteraktif Test');
+  const courseText = (examData.meta && examData.meta.course && examData.meta.course.trim())
+    ? examData.meta.course.trim()
+    : (isEn ? 'General' : 'Genel');
 
   // Seçenekler HTML
   let optionsHtml = '';
@@ -1117,18 +1280,22 @@ function renderDigitalTest() {
           let extraClass = '';
           if (isRevealed) {
             if (opt.letter === q.correctAnswer) {
-              extraClass = 'is-correct';
+              extraClass = 'is-correct is-locked';
             } else if (isSelected) {
-              extraClass = 'is-wrong';
+              extraClass = 'is-wrong is-locked';
+            } else {
+              extraClass = 'is-locked';
             }
+          } else if (isSelected) {
+            extraClass = 'selected';
           }
 
           return `
-            <button class="nlm-opt-btn ${extraClass}" onclick="handleDigitalOptionClick('${q.id}', '${opt.letter}')">
+            <button class="nlm-opt-btn ${extraClass}" ${isRevealed ? 'disabled' : ''} onclick="handleDigitalOptionClick('${q.id}', '${opt.letter}')">
               <span class="nlm-opt-pill">${opt.letter}</span>
-              <span style="flex:1;">${escapeHTML(opt.text || '')}</span>
-              ${isRevealed && opt.letter === q.correctAnswer ? '<i data-lucide="check" style="color:var(--success);"></i>' : ''}
-              ${isRevealed && isSelected && opt.letter !== q.correctAnswer ? '<i data-lucide="x" style="color:var(--danger);"></i>' : ''}
+              <span style="flex:1; min-width:0; white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word;">${escapeHTML(opt.text || '')}</span>
+              ${isRevealed && opt.letter === q.correctAnswer ? '<i data-lucide="check" style="color:var(--success); flex-shrink:0;"></i>' : ''}
+              ${isRevealed && isSelected && opt.letter !== q.correctAnswer ? '<i data-lucide="x" style="color:var(--danger); flex-shrink:0;"></i>' : ''}
             </button>
           `;
         }).join('')}
@@ -1139,7 +1306,7 @@ function renderDigitalTest() {
     optionsHtml = `
       <div style="display:flex; flex-direction:column; gap:0.75rem;">
         <textarea class="form-textarea" rows="4" placeholder="${isEn ? 'Type your answer here...' : 'Cevabınızı buraya yazınız...'}" oninput="handleDigitalClassicInput('${q.id}', this.value)">${escapeHTML(userAns || '')}</textarea>
-        ${!isRevealed ? `
+        ${isLockedMode && !isRevealed ? `
           <button class="btn btn-secondary btn-sm" style="align-self:flex-start;" onclick="revealDigitalAnswer('${q.id}')">
             <i data-lucide="eye"></i> ${isEn ? 'Show Expected Answer' : 'Beklenen Cevabı Göster'}
           </button>
@@ -1148,7 +1315,7 @@ function renderDigitalTest() {
     `;
   }
 
-  // Açıklama / Neden Doğru? Kutusu
+  // Açıklama / Neden Doğru? Kutusu (Yalnızca anında geri bildirim modunda)
   let insightHtml = '';
   if (isRevealed && (q.explanation || q.correctAnswer)) {
     insightHtml = `
@@ -1170,11 +1337,21 @@ function renderDigitalTest() {
       <div class="nlm-header-top">
         <div class="nlm-topic-badge">
           <i data-lucide="book-open"></i>
-          <span>${escapeHTML(examData.meta.course || (isEn ? 'GENERAL QUIZ' : 'GENEL TEST'))}</span>
+          <span>${escapeHTML(courseText)}</span>
         </div>
         <div class="nlm-q-counter">
           <span>${t('test_progress', { current: idx + 1, total })}</span>
           <span class="brand-badge" style="margin-left:6px;">${q.points || 10} ${t('q_points_short')}</span>
+        </div>
+      </div>
+      <div class="nlm-header-meta-row">
+        <div class="nlm-test-title">${escapeHTML(testTitleText)}</div>
+        <div class="nlm-header-pills">
+          <span class="nlm-mini-pill"><i data-lucide="clock" style="width:12px; height:12px;"></i> ${escapeHTML(durationLabel)}</span>
+          <span class="nlm-mini-pill"><i data-lucide="${isLockedMode ? 'lock' : 'edit-3'}" style="width:12px; height:12px;"></i> ${escapeHTML(behaviorBadgeLabel)}</span>
+          <button type="button" class="nlm-settings-link-btn" onclick="switchTab('settings')">
+            <i data-lucide="sliders" style="width:12px; height:12px;"></i> ${t('tab_test_settings')}
+          </button>
         </div>
       </div>
       <div class="nlm-progress-track">
@@ -1212,8 +1389,14 @@ function renderDigitalTest() {
 }
 
 function handleDigitalOptionClick(qId, letter) {
-  digitalTestState.userAnswers[qId] = letter;
-  digitalTestState.revealed[qId] = true;
+  const behavior = (examData.meta && examData.meta.testModeBehavior === 'allow_change') ? 'allow_change' : 'lock_reveal';
+  if (behavior === 'lock_reveal') {
+    if (digitalTestState.revealed[qId]) return;
+    digitalTestState.userAnswers[qId] = letter;
+    digitalTestState.revealed[qId] = true;
+  } else {
+    digitalTestState.userAnswers[qId] = letter;
+  }
   renderDigitalTest();
 }
 
@@ -1326,15 +1509,27 @@ function renderDigitalTestSummary(container) {
         </h3>
         ${examData.questions.map((q, qIdx) => {
           const userAns = digitalTestState.userAnswers[q.id];
-          const isCorrect = userAns === q.correctAnswer;
+          const isClassic = (q.type === 'classic');
+          const isCorrect = isClassic ? !!userAns : (userAns === q.correctAnswer);
+          let statusTag = '';
+          if (isClassic) {
+            statusTag = q.correctAnswer
+              ? `<span style="color:var(--primary); font-weight:600;">(${t('test_correct_ans')} ${escapeHTML(q.correctAnswer)})</span>`
+              : '';
+          } else if (!userAns) {
+            statusTag = `<span style="color:var(--text-muted); font-weight:600;">(${t('test_correct_ans')} ${escapeHTML(q.correctAnswer)})</span>`;
+          } else {
+            statusTag = isCorrect
+              ? `<span style="color:var(--success); font-weight:700;">✓ ${t('test_stat_correct')}</span>`
+              : `<span style="color:var(--danger); font-weight:700;">✗ ${t('test_stat_wrong')} (${t('test_correct_ans')} ${escapeHTML(q.correctAnswer)})</span>`;
+          }
           return `
             <div style="padding:1rem; background:var(--bg-input); border-radius:var(--radius-md); margin-bottom:0.75rem; border-left:4px solid ${isCorrect ? 'var(--success)' : (userAns ? 'var(--danger)' : 'var(--text-muted)')};">
-              <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px;">${qIdx + 1}. ${escapeHTML(q.text || '')}</div>
-              <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:4px;">
-                ${t('test_your_ans')} <strong>${escapeHTML(userAns || (isEn ? 'Left Blank' : 'Boş Bırakıldı'))}</strong> 
-                ${isCorrect ? `<span style="color:var(--success); font-weight:700;">✓ ${t('test_stat_correct')}</span>` : `<span style="color:var(--danger); font-weight:700;">✗ ${t('test_stat_wrong')} (${t('test_correct_ans')} ${escapeHTML(q.correctAnswer)})</span>`}
+              <div style="font-weight:700; font-size:0.95rem; margin-bottom:4px; white-space:pre-wrap; overflow-wrap:break-word;">${qIdx + 1}. ${escapeHTML(q.text || '')}</div>
+              <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:4px; overflow-wrap:break-word;">
+                ${t('test_your_ans')} <strong>${escapeHTML(userAns || (isEn ? 'Left Blank' : 'Boş Bırakıldı'))}</strong> ${statusTag}
               </div>
-              ${q.explanation ? `<div style="font-size:0.85rem; color:var(--text-main); background:var(--bg-card); padding:8px 12px; border-radius:6px; margin-top:6px;">💡 <strong>${isEn ? 'Explanation:' : 'Açıklama:'}</strong> ${escapeHTML(q.explanation)}</div>` : ''}
+              ${q.explanation ? `<div style="font-size:0.85rem; color:var(--text-main); background:var(--bg-card); padding:8px 12px; border-radius:6px; margin-top:6px; white-space:pre-wrap; overflow-wrap:break-word;">💡 <strong>${isEn ? 'Explanation:' : 'Açıklama:'}</strong> ${escapeHTML(q.explanation)}</div>` : ''}
             </div>
           `;
         }).join('')}
@@ -1377,20 +1572,22 @@ function copyAiPrompt() {
   const isEn = (getLanguage() === 'en');
   const promptText = isEn ? `Please convert the questions below into this exact structure so that my exam tool can parse them automatically:
 
+- Wrap the entire output inside a single plain text code block (\`\`\`text ... \`\`\`) so that question numbers can be copied as plain text.
 - Each question starts with "1. Question text"
 - Multiple choice options on separate lines: "A) ...", "B) ...", "C) ...", "D) ..."
 - Correct answers placed below each question as "Answer: X"
 - If any explanation exists, add it as "Explanation: ..."
-- Do not include greetings or markdown wrappers, only output the questions in this format.
+- Do not include greetings or any extra text outside the code block, only output the questions inside the code block.
 
 Questions to convert:
 [Paste your questions here]` : `Aşağıda vereceğim soruları, sınav hazırlama aracımın otomatik algılayabilmesi için birebir şu formata dönüştür:
 
+- Tüm çıktıyı tek bir düz metin kod bloğu (\`\`\`text ... \`\`\`) içine al ki soru numaraları düz yazı olarak kopyalanabilsin.
 - Her soru numarası "1. Soru metni" şeklinde başlasın.
 - Çoktan seçmeli sorularda şıklar alt alta "A) ...", "B) ...", "C) ...", "D) ..." şeklinde olsun.
 - Doğru cevaplar her sorunun altında "Cevap: X" şeklinde belirtilsin.
 - Varsa kısa açıklama "Açıklama: ..." şeklinde eklensin.
-- Başka hiçbir selamlama veya fazladan metin yazma, sadece soruları bu formatta ver.
+- Başka hiçbir selamlama veya fazladan metin yazma, sadece kod bloğu içindeki soruları ver.
 
 Dönüştürülecek sorularım:
 [Buraya sorularınızı yapıştırın]`;
@@ -1637,7 +1834,7 @@ function updateBulkPreview() {
                 const isCorrect = (opt.letter === q.correctAnswer);
                 return `
                   <span class="bulk-opt-chip ${isCorrect ? 'correct' : ''}">
-                    <strong>${opt.letter})</strong> ${escapeHTML(opt.text || '')} ${isCorrect ? '✓' : ''}
+                    <strong>${opt.letter})</strong> <span>${escapeHTML(opt.text || '')}${isCorrect ? ' ✓' : ''}</span>
                   </span>
                 `;
               }).join('')}
@@ -1646,7 +1843,7 @@ function updateBulkPreview() {
         } else if (q.type === 'classic' && q.correctAnswer) {
           optionsHtml = `
             <div class="bulk-card-explanation" style="color:var(--text-main); font-style:normal;">
-              <strong>${isEn ? 'Expected Answer:' : 'Beklenen Cevap:'}</strong> ${escapeHTML(q.correctAnswer)}
+              <strong>${isEn ? 'Expected Answer:' : 'Beklenen Cevap:'}</strong> <span>${escapeHTML(q.correctAnswer)}</span>
             </div>
           `;
         }
@@ -1655,7 +1852,7 @@ function updateBulkPreview() {
         if (q.explanation) {
           expHtml = `
             <div class="bulk-card-explanation">
-              <i data-lucide="help-circle" style="width:12px; height:12px;"></i> ${escapeHTML(q.explanation)}
+              <i data-lucide="help-circle" style="width:12px; height:12px; flex-shrink:0; margin-top:2px;"></i> <span>${escapeHTML(q.explanation)}</span>
             </div>
           `;
         }
@@ -1683,29 +1880,429 @@ function updateBulkPreview() {
 
 function preProcessCondensedText(raw) {
   if (!raw) return '';
-  let text = raw;
+  let text = String(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-  // 1. Soru Başlıklarını Ayır (Satır başı olmasa veya bitişik olsa bile):
-  // Örnek: "...alanına girer.Soru 2: AAA..." -> "...alanına girer.\n\nSoru 2: AAA..."
-  text = text.replace(/(?<!^)(?=(?:Soru|Question|Q)\s*\d+[\s\.:\-_])/gi, '\n\n');
+  // 1. Bitişik Soru Başlıklarını Ayır (Örn: "...alanına girer.Soru 2: AAA...")
+  text = text.replace(/(?<=[^\n])(?=(?:(?:Soru|Question)\s*\d+[\s\.:\-_]|(?<![A-Za-zÇçĞğİıÖöŞşÜü])Q\s*\d+[\.:\-_]))/gi, '\n\n');
 
-  // Numaralı soru başlıkları (Örn: "...ifade eder? 2. ...")
-  text = text.replace(/(?<!(?:Soru|Question|Q)\s*)(?<=[.?!;:\n])\s*(?=\b\d{1,3}[\.\)\:\-]\s+)/g, '\n\n');
+  // Aynı satırda cümle sonundan hemen sonra gelen numaralı soru başlıkları (Örn: "...ifade eder? 2. ...")
+  // Küçük harfle devam eden sıra sayılarını ("20. yüzyılda", "2. katta") ve tarihsel/özel tamlamaları ("1. Dünya", "1. Murat") bölmez.
+  text = text.replace(
+    /(?<!(?:Soru|Question|Q)\s*)(?<=[.?!;:])[ \t]+(?=\d{1,3}[\.\)\:\-][ \t]+(?!(?:Dünya|Cihan|İnönü|Meşrutiyet|Murat|Mahmut|Selim|Bayezid|Mehmet|Ahmet|Mustafa|Süleyman|Abdülhamid|Orhan|Osman|Kılıçarslan|TBMM|Beş|Ordu|Kolordu|Kat|Derece|Bölüm|Kısım|Madde)\b)[A-ZÇĞİÖŞÜ0-9"“'(\[])/g,
+    '\n\n'
+  );
 
-  // 2. Doğru Cevap / Yanıt Satırını Ayır:
+  // 2. Bitişik Doğru Cevap / Yanıt Satırını Ayır:
   // Örnek: "...ölçmekDoğru Cevap: B" -> "...ölçmek\nDoğru Cevap: B"
-  text = text.replace(/(?<=[^\n])(?=(?:Doğru\s+)?(?:Cevap|Yanıt|Answer|Key)\s*[:=]\s*\(?[A-HÇçA-Za-z0-9]\)?)/gi, '\n');
+  text = text.replace(/(?<=[^\n])(?=(?:Doğru\s+)?(?:Cevap|Yanıt|Answer)\s*[:=])/gi, '\n');
+  text = text.replace(/(?<=[^\n])(?=Key\s*[:=]\s*\(?[A-GDTYF]\)?(?:\s|$))/gi, '\n');
 
   // Doğru Cevabın hemen ardından gelen açıklamayı alt satıra al:
-  // "Doğru Cevap: BA yanlıştır" -> "Doğru Cevap: B\nAçıklama: A yanlıştır"
-  text = text.replace(/((?:Doğru\s+)?(?:Cevap|Yanıt|Answer|Key)\s*[:=]\s*\(?[A-HÇçA-Za-z0-9]\)?)\s*([A-Za-zÇçĞğİıÖöŞşÜü].*)/gi, '$1\nAçıklama: $2');
+  // "Doğru Cevap: BA yanlıştır" veya "Cevap: B. Açıklama" gibi durumları ayırır;
+  // "Cevap: Fosil yakıt..." veya "Cevap: Ankara" gibi tam kelime cevaplarını ASLA bölmez.
+  text = text.replace(
+    /^([ \t]*(?:Doğru\s+)?(?:Cevap|Yanıt|Answer|Key)\s*[:=]\s*\(?([A-GDTY1-5])\)?)(?:([.\-:]?[ \t]+)(?!(?:Açıklama|Çözüm|Explanation|Not)\s*[:=])([A-Za-zÇçĞğİıÖöŞşÜü"“(].*)|(?=[A-ZÇĞİÖŞÜ](?:[a-zçğıöşü]|[ \t]+))([A-ZÇĞİÖŞÜ].*))$/gm,
+    (full, ansPart, ansTok, sep, spacedExp, gluedExp) => {
+      if (spacedExp) {
+        const isDigitToken = /^[1-5]$/.test(ansTok);
+        const hasPunctSep = /^[.\-:]/.test(sep || '');
+        const startsUpper = /^[A-ZÇĞİÖŞÜ"“(]/.test(spacedExp);
+        if (isDigitToken && !hasPunctSep) return full;
+        if (!hasPunctSep && !startsUpper) return full;
+      }
+      const exp = (spacedExp || gluedExp || '').trim();
+      return exp ? `${ansPart}\nAçıklama: ${exp}` : full;
+    }
+  );
 
-  // 3. Şıkları Ayır (Yapışık olanları alt alta al):
+  // 3. Yapışık (boşluksuz) şıkları ayır:
   // Örnek: "...uyumunu doğrulamakB) Sistemin..." -> "...uyumunu doğrulamak\nB) Sistemin..."
-  // Dikkat: (?<![A-Z]) ile (TDD), (UI), (API), (E2E) gibi büyük harfli kısaltmaların bölünmesi engellenir!
-  text = text.replace(/(?<=[^\n])(?<![A-Z])(?=[\*\✓]?\s*(?:\([A-HÇç]\)|\[[A-HÇç]\]|[A-HÇç][\.\)\:\-])(?:\s+|(?=[A-Za-zÇçĞğİıÖöŞşÜü\$\(])))/g, '\n');
+  // Yalnızca "B)", "(B)", "[B]" gibi biçimlerde ve öncesi büyük harf/parantez/boşluk değilken çalışır;
+  // "E-posta", "A.Ş.", "Amaç:", "D.T.C.F.", "veya (A)" ve satır başı "\n(A)" ifadelerini bölmez.
+  text = text.replace(
+    /(?<=[^\n\s])(?<![A-ZÇĞİÖŞÜ(\[\*\✓])(?=(?:[\*\✓][ \t]*)?(?:\([A-G]\)|\[[A-G]\]|[A-G]\))(?:\s+(?=[A-Za-zÇçĞğİıÖöŞşÜü0-9\$\("“'(\[])|(?=[A-Za-zÇçĞğİıÖöŞşÜü0-9\$\("“'])))/g,
+    '\n'
+  );
 
   return text;
+}
+
+const VALID_OPTION_SEQUENCES = {
+  A: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+  D: ['D', 'Y'],
+  T: ['T', 'F']
+};
+
+function parseOptionLine(line) {
+  if (!line) return null;
+  // Yalnızca geçerli şık harfleri: A-G, D/Y, T/F (I, X, Ç vb. şık olarak algılanmaz!)
+  // Nokta, iki nokta veya tire sonrası boşluk ya da satır sonu gerektirir ("A.Ş.", "E-posta", "e.g." elenir).
+  const m = line.match(
+    /^([\*\✓]|\([xX✓]\))?\s*(?:\(([A-Ga-gDYdyTFtf])\)|\[([A-Ga-gDYdyTFtf])\]|([A-Ga-gDYdyTFtf])(?:\)|[\.\:\-](?=\s|$)))(\*)?\s*(.*)$/
+  );
+  if (!m) return null;
+
+  const letter = (m[2] || m[3] || m[4]).toUpperCase();
+  const hasLeadingStar = !!(m[1] || m[5]);
+  const text = (m[6] || '').trim();
+  return { letter, hasLeadingStar, text };
+}
+
+function isValidOptionLetterChain(letters) {
+  if (!letters || letters.length < 2) return false;
+  const first = letters[0];
+  const expected = VALID_OPTION_SEQUENCES[first];
+  if (!expected || letters.length > expected.length) return false;
+  for (let i = 0; i < letters.length; i++) {
+    if (letters[i] !== expected[i]) return false;
+  }
+  return true;
+}
+
+function findValidOptionSequence(lines, startSearchIdx = 0) {
+  const candidates = [];
+  for (let i = startSearchIdx; i < lines.length; i++) {
+    const parsed = parseOptionLine(lines[i]);
+    if (parsed) {
+      candidates.push({ lineIdx: i, ...parsed });
+    }
+  }
+  if (candidates.length < 2) return null;
+
+  // Sondan başa doğru en son geçerli ardışık şık dizisini bul (A, B, C... veya D, Y / T, F)
+  // Böylece soru kökünde yer alan tekil "A. ...", "(A)", "A: ..." ifadeleri şık sanılmaz.
+  for (let start = candidates.length - 2; start >= 0; start--) {
+    if (!VALID_OPTION_SEQUENCES[candidates[start].letter]) continue;
+    for (let end = candidates.length; end >= start + 2; end--) {
+      const slice = candidates.slice(start, end);
+      if (isValidOptionLetterChain(slice.map(c => c.letter))) {
+        // Sondaki gerçek şık grubu olduğundan emin ol (ardında şık olmayan bir başka şık adayını bırakma)
+        if (end === candidates.length) {
+          return slice;
+        }
+      }
+    }
+  }
+
+  // Eğer sonda tek bir sahte aday kaldıysa en uzun geçerli diziyi bul
+  let best = null;
+  for (let start = candidates.length - 2; start >= 0; start--) {
+    if (!VALID_OPTION_SEQUENCES[candidates[start].letter]) continue;
+    for (let end = candidates.length; end >= start + 2; end--) {
+      const slice = candidates.slice(start, end);
+      if (isValidOptionLetterChain(slice.map(c => c.letter))) {
+        if (!best || slice.length > best.length) {
+          best = slice;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function expandInlineOptionsInBlockLines(rawLines) {
+  const result = [];
+  const candidateRe = /(?:(?<=^)|(?<=\S)[ \t]+|(?<=[^\n\sA-ZÇĞİÖŞÜ(\[\*\✓])(?=(?:[\*\✓][ \t]*)?(?:\([A-G]\)|\[[A-G]\]|[A-G]\))))([\*\✓]?[ \t]*(?:\(([A-Ga-gDYdyTFtf])\)|\[([A-Ga-gDYdyTFtf])\]|([A-Ga-gDYdyTFtf])(?:\)|[\.\:\-](?=[ \t]|$)))(\*?))/g;
+
+  for (let idx = 0; idx < rawLines.length; idx++) {
+    const line = rawLines[idx];
+    const remainingHasChain = !!findValidOptionSequence(rawLines, idx + 1);
+    const nextLineParsed = idx + 1 < rawLines.length ? parseOptionLine(rawLines[idx + 1]) : null;
+    const nextLineStartsOption = !!nextLineParsed;
+
+    // Eğer sonraki satırlarda zaten eksiksiz bir şık dizisi (A, B, C...) varsa
+    // ve sonraki satır B/Y/F ile başlamıyorsa bu satırı gereksiz yere bölme.
+    if (remainingHasChain && !(nextLineParsed && ['B', 'Y', 'F'].includes(nextLineParsed.letter))) {
+      result.push(line);
+      continue;
+    }
+
+    const matches = [];
+    let m;
+    candidateRe.lastIndex = 0;
+    while ((m = candidateRe.exec(line)) !== null) {
+      const letter = (m[2] || m[3] || m[4]).toUpperCase();
+      // Küçük harf ise satır içi bölme için mutlaka boşlukla ayrılmış olmalı (kelime sonu parantezleri bozmaz)
+      const rawLetter = m[2] || m[3] || m[4];
+      const isLower = rawLetter !== rawLetter.toUpperCase();
+      const charBefore = m.index > 0 ? line[m.index - 1] : '';
+      if (isLower && m.index > 0 && !/[ \t]/.test(charBefore)) continue;
+
+      matches.push({ index: m.index, letter });
+    }
+
+    if (matches.length === 0) {
+      result.push(line);
+      continue;
+    }
+
+    let splitIndices = null;
+
+    // Durum 1: Aynı satırda geçerli ardışık şık dizisi (A) ... B) ... C) ... D) ...)
+    for (let s = matches.length - 2; s >= 0; s--) {
+      if (!VALID_OPTION_SEQUENCES[matches[s].letter]) continue;
+      for (let e = matches.length; e >= s + 2; e--) {
+        const slice = matches.slice(s, e);
+        if (isValidOptionLetterChain(slice.map(x => x.letter)) && e === matches.length) {
+          splitIndices = slice.map(x => x.index).filter(pos => pos > 0);
+          break;
+        }
+      }
+      if (splitIndices) break;
+    }
+
+    // Durum 2: Bu satırın sonunda tek A) / D) / T) var ve bir sonraki satır B) / Y) / F) ile devam ediyor
+    if (!splitIndices && nextLineStartsOption) {
+      const expectedFirst = nextLineParsed.letter === 'B' ? 'A'
+        : nextLineParsed.letter === 'Y' ? 'D'
+        : nextLineParsed.letter === 'F' ? 'T'
+        : null;
+      if (expectedFirst) {
+        for (let k = matches.length - 1; k >= 0; k--) {
+          if (matches[k].letter === expectedFirst && matches[k].index > 0) {
+            splitIndices = [matches[k].index];
+            break;
+          }
+        }
+      }
+    }
+
+    if (!splitIndices || splitIndices.length === 0) {
+      result.push(line);
+      continue;
+    }
+
+    let prev = 0;
+    splitIndices.forEach(pos => {
+      const part = line.slice(prev, pos).trim();
+      if (part) result.push(part);
+      prev = pos;
+    });
+    const tail = line.slice(prev).trim();
+    if (tail) result.push(tail);
+  }
+
+  return result;
+}
+
+function extractBottomAnswerKey(text) {
+  const answerKeyMap = {};
+  const lines = text.split('\n');
+  const keyHeaderRe = /^\s*(?:Cevap\s*Anahtar[ıi]|Yan[ıi]t\s*Anahtar[ıi]|Cevaplar|Yan[ıi]tlar|Answers?|Answer\s*Key)\s*[:=]?\s*(.*)$/i;
+  const pairRe = /(?:^|[\s,;\|]+)(\d{1,3})\s*(?:[\.\-\:\)\/]\s*|\s+)\(?([A-GDTYF])\)?(?=$|[\s,;\|.])/gi;
+
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(keyHeaderRe);
+    if (!m) continue;
+
+    const tailLines = lines.slice(i + 1).map(l => l.trim()).filter(Boolean);
+    // Arkasında gerçek şıklı sorular devam ediyorsa metin ortasındaki başlığı kesme
+    const looksLikeQuestionsFollow = tailLines.some(l => /^\s*[\*\✓]?\s*(?:\([A-G]\)|\[[A-G]\]|[A-G][\.\)\:])\s+\S/.test(l));
+    if (looksLikeQuestionsFollow) continue;
+
+    const tailText = [m[1] || '', ...lines.slice(i + 1)].join('\n').trim();
+    if (!tailText) continue;
+
+    const pairs = [...tailText.matchAll(pairRe)];
+    if (pairs.length >= 1) {
+      pairs.forEach(p => {
+        const qNum = parseInt(p[1], 10);
+        const ans = p[2].toUpperCase();
+        answerKeyMap[qNum] = ans;
+      });
+      return {
+        text: lines.slice(0, i).join('\n').trim(),
+        answerKeyMap
+      };
+    }
+  }
+
+  return { text, answerKeyMap };
+}
+
+function chunkHasOptionsOrAnswer(rawLines) {
+  const lines = expandInlineOptionsInBlockLines(rawLines.map(l => l.trim()).filter(Boolean));
+  const hasAnswerLine = lines.some(l => /^(?:Doğru\s*)?(?:Cevap|Yan[ıi]t|Doğru\s*Seçenek|Answer|Key)\s*[:=]/i.test(l));
+  if (hasAnswerLine) return true;
+  return !!findValidOptionSequence(lines, 0);
+}
+
+function splitTextIntoQuestionBlocks(text) {
+  const lines = text.split('\n');
+  const explicitHeaderRe = /^\s*(?:Soru|Question|Q)[\s\.:\-_]*(\d+)(?:[\s\.:\-_]+(.*)|$)/i;
+  const numericHeaderRe = /^\s*(?:(\d{1,3})[\.\)\:\/\-_]|\[(\d{1,3})\]|\((\d{1,3})\))\s*(.*)$/;
+
+  // 1. Ham satır parçalarına (chunks) ayır
+  const chunks = [];
+  let curChunk = { kind: 'unnumbered', num: null, lines: [] };
+  let prevOuterNumSeen = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Yatay ayırıcı çizgiler (---, ===) soruları net biçimde böler
+    if (/^\s*[-=_]{3,}\s*$/.test(line)) {
+      if (curChunk.lines.some(l => l.trim() !== '')) {
+        chunks.push(curChunk);
+        curChunk = { kind: 'unnumbered', num: null, lines: [] };
+      }
+      continue;
+    }
+
+    const expM = line.match(explicitHeaderRe);
+    if (expM) {
+      if (curChunk.lines.some(l => l.trim() !== '')) chunks.push(curChunk);
+      const num = parseInt(expM[1], 10);
+      prevOuterNumSeen = num;
+      curChunk = { kind: 'explicit', num, lines: [line] };
+      continue;
+    }
+
+    const numM = line.match(numericHeaderRe);
+    if (numM) {
+      const num = parseInt(numM[1] || numM[2] || numM[3], 10);
+      const rest = (numM[4] || '').trim();
+      const startsLower = /^[a-zçğıöşü]/.test(rest);
+      const isJumpedProseOrdinal = startsLower && num !== 1 && num !== prevOuterNumSeen + 1;
+
+      if (!isJumpedProseOrdinal) {
+        if (curChunk.lines.some(l => l.trim() !== '')) chunks.push(curChunk);
+        prevOuterNumSeen = Math.max(prevOuterNumSeen, num);
+        curChunk = { kind: 'numeric', num, lines: [line] };
+        continue;
+      }
+    }
+
+    // Tamamlanmış bir sorudan sonra boş satır ve ardından yeni bir numarasız soru başlıyorsa ayır
+    if (line.trim() === '' && curChunk.lines.some(l => l.trim() !== '') && chunkHasOptionsOrAnswer(curChunk.lines)) {
+      let nextIdx = i + 1;
+      while (nextIdx < lines.length && lines[nextIdx].trim() === '') nextIdx++;
+      if (nextIdx < lines.length) {
+        const nextTrim = lines[nextIdx].trim();
+        const nextStartsHeader = explicitHeaderRe.test(nextTrim) || numericHeaderRe.test(nextTrim);
+        const nextStartsMetaOrOpt = !!parseOptionLine(nextTrim) ||
+          /^(?:Doğru\s*)?(?:Cevap|Yan[ıi]t|Doğru\s*Seçenek|Açıklama|Çözüm|Answer|Explanation|Not|Key)\s*[:=]/i.test(nextTrim);
+        if (!nextStartsHeader && !nextStartsMetaOrOpt) {
+          const paraLines = [];
+          for (let k = nextIdx; k < lines.length; k++) {
+            const kt = lines[k].trim();
+            if (kt === '' || explicitHeaderRe.test(kt) || numericHeaderRe.test(kt)) break;
+            paraLines.push(lines[k]);
+          }
+          const curHasExplanation = curChunk.lines.some(l => /^\s*(?:Açıklama|Çözüm|Explanation|Not)\s*[:=]/i.test(l));
+          const nextParaHasOptsOrAns = chunkHasOptionsOrAnswer(paraLines);
+          const nextParaEndsQuestion = paraLines.length > 0 && /\?\s*$/.test(paraLines[paraLines.length - 1].trim());
+          if (!curHasExplanation || nextParaHasOptsOrAns || nextParaEndsQuestion) {
+            chunks.push(curChunk);
+            curChunk = { kind: 'unnumbered', num: null, lines: [] };
+            i = nextIdx - 1;
+            continue;
+          }
+        }
+      }
+    }
+
+    curChunk.lines.push(line);
+  }
+  if (curChunk.lines.some(l => l.trim() !== '')) chunks.push(curChunk);
+
+  // Eğer hiçbir numaralı soru başlığı yoksa boş satır / ayırıcı çizgi ile böl
+  const hasNumberedChunk = chunks.some(c => c.kind !== 'unnumbered');
+  if (!hasNumberedChunk) {
+    const rawParts = text.split(/(?:\n\s*){2,}|(?:\n[-=_]{3,}(?:\n)?)/).map(p => p.trim()).filter(Boolean);
+    const mergedParts = [];
+    for (const part of rawParts) {
+      const firstLine = part.split('\n')[0].trim();
+      const startsWithOptOrAns = !!parseOptionLine(firstLine) ||
+        /^(?:Doğru\s*)?(?:Cevap|Yan[ıi]t|Doğru\s*Seçenek|Açıklama|Çözüm|Answer|Explanation|Key)\s*[:=]/i.test(firstLine);
+      if (startsWithOptOrAns && mergedParts.length > 0) {
+        mergedParts[mergedParts.length - 1] += '\n' + part;
+      } else {
+        mergedParts.push(part);
+      }
+    }
+    return mergedParts;
+  }
+
+  // 2. Soru içi 1., 2., 3. öncül bloklarını aktif soruya birleştir
+  const grouped = [];
+  for (let idx = 0; idx < chunks.length; idx++) {
+    const c = chunks[idx];
+    const cCompleted = chunkHasOptionsOrAnswer(c.lines);
+
+    if (grouped.length === 0) {
+      grouped.push({
+        outerKind: c.kind,
+        outerNum: c.num,
+        hasCompletedBody: cCompleted,
+        inPremiseMode: false,
+        lastPremiseNum: 0,
+        lines: [...c.lines]
+      });
+      continue;
+    }
+
+    const cur = grouped[grouped.length - 1];
+    let shouldMerge = false;
+
+    if (c.kind === 'numeric' && !cur.hasCompletedBody) {
+      if (cur.inPremiseMode) {
+        const isNextPremise = (c.num === cur.lastPremiseNum + 1);
+        const looksLikeNextOuterQuestion = (cur.outerNum !== null && c.num === cur.outerNum + 1 && cur.lastPremiseNum >= cur.outerNum + 1);
+        if (isNextPremise && !looksLikeNextOuterQuestion) {
+          shouldMerge = true;
+        }
+      } else {
+        const curLastNonEmpty = [...cur.lines].reverse().find(l => l.trim() !== '') || '';
+        const curEndsWithColon = /:\s*$/.test(curLastNonEmpty);
+
+        // İlerideki ardışık öncüller şıklara ulaşıyor mu?
+        let chainReachesOptions = cCompleted;
+        if (!chainReachesOptions) {
+          let expectedNext = c.num + 1;
+          for (let look = idx + 1; look < chunks.length; look++) {
+            const nxt = chunks[look];
+            if (nxt.kind !== 'numeric' || nxt.num !== expectedNext) break;
+            if (chunkHasOptionsOrAnswer(nxt.lines)) {
+              chainReachesOptions = true;
+              break;
+            }
+            expectedNext++;
+          }
+        }
+
+        if (cur.outerKind === 'explicit') {
+          if (!cCompleted || curEndsWithColon) shouldMerge = true;
+        } else if (cur.outerNum !== null && c.num <= cur.outerNum) {
+          if (!cCompleted && (curEndsWithColon || chainReachesOptions || cur.outerNum === 1)) {
+            shouldMerge = true;
+          } else if (curEndsWithColon) {
+            shouldMerge = true;
+          }
+        } else if (cur.outerKind === 'unnumbered' && c.num === 1 && !cCompleted && (curEndsWithColon || chainReachesOptions)) {
+          shouldMerge = true;
+        }
+      }
+    }
+
+    if (shouldMerge) {
+      cur.lines.push(...c.lines);
+      cur.inPremiseMode = true;
+      cur.lastPremiseNum = c.num;
+      if (cCompleted) cur.hasCompletedBody = true;
+    } else {
+      grouped.push({
+        outerKind: c.kind,
+        outerNum: c.num,
+        hasCompletedBody: cCompleted,
+        inPremiseMode: false,
+        lastPremiseNum: 0,
+        lines: [...c.lines]
+      });
+    }
+  }
+
+  return grouped.map(g => g.lines.join('\n').trim()).filter(Boolean);
 }
 
 function parseBulkText(rawText) {
@@ -1715,34 +2312,12 @@ function parseBulkText(rawText) {
   let text = preProcessCondensedText(rawText.trim());
 
   // 1. Metin sonundaki Cevap Anahtarı Bloğunu Tespit Et ve Ayıkla
-  const answerKeyMap = {};
-  const answerKeyRegex = /(?:^|\r?\n)\s*(?:(?:Cevap\s*Anahtar[ıi]|Yan[ıi]t\s*Anahtar[ıi]|Cevaplar|Yan[ıi]tlar|Answers?|Answer\s*Key)\s*[:=]?\s*)([\s\S]+)$/i;
-  const keyMatch = text.match(answerKeyRegex);
-  if (keyMatch) {
-    const keyBlock = keyMatch[1];
-    const pairRegex = /(\d+)[\.\-\:\)\/\s]+\s*\(?([A-HÇçA-Za-zDYdy])\)?/g;
-    let m;
-    while ((m = pairRegex.exec(keyBlock)) !== null) {
-      const qNum = parseInt(m[1], 10);
-      let ans = m[2].toUpperCase();
-      answerKeyMap[qNum] = ans;
-    }
-    text = text.substring(0, keyMatch.index).trim();
-  }
+  const extractedKey = extractBottomAnswerKey(text);
+  text = extractedKey.text;
+  const answerKeyMap = extractedKey.answerKeyMap;
 
-  // 2. Metni Soru Bloklarına Ayır
-  const headerPatternStr = '(?:(?:Soru|Question|Q)[\\s\\.:\\-_]*\\d+[\\s\\.:\\-_]*|\\d+[\\.\\)\\:\\/\\-_]|\\[\\d+\\]|\\(\\d+\\))';
-  const questionHeaderPattern = new RegExp('(?:^|\\r?\\n)\\s*' + headerPatternStr + '\\s*', 'gi');
-  const matches = [...text.matchAll(questionHeaderPattern)];
-
-  let rawBlocks = [];
-  if (matches.length >= 2 || (matches.length === 1 && matches[0].index === 0)) {
-    const splitRegex = new RegExp('(?:\\r?\\n)+(?=\\s*' + headerPatternStr + '\\s*)', 'i');
-    rawBlocks = text.split(splitRegex);
-  } else {
-    // Numaralandırma yoksa çift boşluk / çizgi ile böl
-    rawBlocks = text.split(/(?:\r?\n\s*){2,}|(?:\r?\n[-=_]{3,}(?:\r?\n)?)/);
-  }
+  // 2. Metni Soru Bloklarına Ayır (1., 2., 3. öncülleri koruyarak)
+  const rawBlocks = splitTextIntoQuestionBlocks(text);
 
   const questions = [];
 
@@ -1750,76 +2325,142 @@ function parseBulkText(rawText) {
     block = block.trim();
     if (!block) return;
 
-    // 3. Yan Yana Şıkları ve Açıklamaları Ayrı Satırlara Genişlet (Inline Option Expander)
+    // 3. Cevap ve Açıklama satırlarını ayır
     let expandedBlock = block
-      .replace(/(?<=\S)[ \t]+(?=[\*\✓]?\s*(?:\([A-HÇçA-Za-z]\)|\[[A-HÇçA-Za-z]\]|[A-HÇçA-Za-z][\.\)\:\-])\s+)/g, '\n')
-      .replace(/(?<=\S)[ \t]+(?=(?:Cevap|Yanıt|Doğru\s*Cevap|Doğru\s*Yanıt|Açıklama|Çözüm|Answer|Explanation)\s*[:=])/gi, '\n');
+      .replace(/(?<=\S)[ \t]+(?=(?:Doğru\s*)?(?:Cevap|Yan[ıi]t|Doğru\s*Seçenek|Açıklama|Çözüm|Answer|Explanation)\s*[:=])/gi, '\n')
+      .replace(/(?<=\S)[ \t]+(?=Key\s*[:=]\s*\(?[A-GDTYF]\)?(?:\s|$))/gi, '\n');
 
-    const lines = expandedBlock.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    const rawLines = expandedBlock.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+    if (rawLines.length === 0) return;
+
+    // Yan yana şıkları yalnızca gerçek şık dizisi varsa ayrı satırlara genişlet
+    const lines = expandInlineOptionsInBlockLines(rawLines);
     if (lines.length === 0) return;
 
     // 4. Soru Başlığı ve Numarası
     let qNumber = null;
-    let qText = '';
-    let options = [];
-    let correctAnswer = null;
-    let explanation = '';
-    let readingOptions = false;
-
-    // İlk satırdaki soru numarasını temizle
+    let firstLineStem = '';
     const firstLineMatch = lines[0].match(/^\s*(?:(?:Soru|Question|Q)[\s\.:\-_]*(\d+)|(\d+)[\.\)\:\/\-_]|\[(\d+)\]|\((\d+)\))\s*(.*)/i);
     if (firstLineMatch) {
       qNumber = parseInt(firstLineMatch[1] || firstLineMatch[2] || firstLineMatch[3] || firstLineMatch[4], 10);
-      qText = firstLineMatch[5].trim();
+      firstLineStem = firstLineMatch[5].trim();
     } else {
-      qText = lines[0];
+      firstLineStem = lines[0];
       qNumber = blockIdx + 1;
     }
-    qText = qText.replace(/^[\s\.\:\-_/]+/, '').trim();
+    firstLineStem = firstLineStem.replace(/^[\s\.\:\-_/]+/, '').trim();
+
+    // Alt kısımdaki Cevap ve Açıklama satırlarını topla
+    const contentLines = [firstLineStem];
+    let rawAnswerValue = null;
+    let explanation = '';
+    let metaMode = null;
 
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i];
-
-      // A) Şık Eşleşmesi Kontrolü
-      const optMatch = line.match(/^([\*\✓]|\([xX✓]\))?\s*(?:\(([A-HÇçA-Za-z])\)|\[([A-HÇçA-Za-z])\]|([A-HÇçA-Za-z])[\.\)\:\-])(\*)?\s*(.*)$/);
-      
-      // B) Cevap Eşleşmesi Kontrolü
-      const ansMatch = line.match(/^(?:Doğru\s*)?(?:Cevap|Yanıt|Doğru\s*Seçenek|Answer|Key)\s*[:=]\s*\(?([A-HÇçA-Za-zDYdy1-5])\)?/i);
-
-      // C) Açıklama / Çözüm Eşleşmesi Kontrolü
-      const expMatch = line.match(/^(?:Açıklama|Çözüm|Explanation|Not)\s*[:=]\s*(.*)/i);
+      const ansMatch = line.match(/^(?:Doğru\s*)?(?:Cevap|Yan[ıi]t|Doğru\s*Seçenek|Answer|Key)\s*[:=]\s*(.+)$/i);
+      const expMatch = line.match(/^(?:Açıklama|Çözüm|Explanation|Not)\s*[:=]\s*(.*)$/i);
 
       if (ansMatch) {
-        let ansVal = ansMatch[1].toUpperCase();
-        const numToLetter = { '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' };
-        correctAnswer = numToLetter[ansVal] || ansVal;
+        rawAnswerValue = ansMatch[1].trim();
+        metaMode = 'answer';
       } else if (expMatch) {
         explanation = expMatch[1].trim();
-      } else if (optMatch) {
-        readingOptions = true;
-        const hasLeadingStar = !!(optMatch[1] || optMatch[5]);
-        const letter = (optMatch[2] || optMatch[3] || optMatch[4]).toUpperCase();
-        let optText = optMatch[6].trim();
-
-        if (/[\*\✓]$|\(Doğru\)|\(True\)|\[x\]$/i.test(optText)) {
-          correctAnswer = letter;
-          optText = optText.replace(/[\*\✓]$|\(Doğru\)|\(True\)|\[x\]$/i, '').trim();
-        } else if (hasLeadingStar) {
-          correctAnswer = letter;
-        }
-
-        options.push({
-          letter: letter,
-          text: optText
-        });
+        metaMode = 'explanation';
+      } else if (metaMode === 'explanation') {
+        explanation += (explanation ? '\n' : '') + line;
+      } else if (metaMode === 'answer') {
+        rawAnswerValue += '\n' + line;
       } else {
-        if (!readingOptions) {
-          qText += (qText ? ' ' : '') + line;
+        contentLines.push(line);
+      }
+    }
+
+    // Şık dizisini yalnızca bloğun altındaki ardışık geçerli seçeneklerden (A, B, ... veya D/Y, T/F) tespit et
+    const optStartSearch = firstLineStem ? 1 : 0;
+    let validSeq = findValidOptionSequence(contentLines, optStartSearch);
+
+    // Eğer ilk satırdaki soru numarasından hemen sonra A) şıkkı geldiyse (örn: "1. A) ... \n B) ...")
+    if (!validSeq && firstLineStem && parseOptionLine(firstLineStem)) {
+      validSeq = findValidOptionSequence(contentLines, 0);
+    }
+
+    // Soru kökü içinde sadece (A) ve (B) ifadeleri geçip ardından soru cümlesi/klasik cevap geliyorsa şık sayma
+    if (validSeq && validSeq.length === 2 && !/^(?:D|T)$/i.test(validSeq[0].letter)) {
+      const lastOptLineIdx = validSeq[validSeq.length - 1].lineIdx;
+      const trailingLines = contentLines.slice(lastOptLineIdx + 1).map(l => l.trim()).filter(Boolean);
+      const trailingText = trailingLines.join(' ');
+      const hasQuestionTail = trailingLines.length > 0 && (
+        /\?\s*$/.test(trailingText) ||
+        /\b(?:hangisi|hangileri|açıklayınız|yazınız|belirtiniz|yorumlayınız|karşılaştırınız|nedir|nelerdir)\b/i.test(trailingText)
+      );
+      const isTFWords = /^(?:doğru|true)$/i.test(validSeq[0].text.trim()) && /^(?:yanlış|false)$/i.test(validSeq[1].text.trim());
+      const hasClassicNonChoiceAnswer = !!(!isTFWords && rawAnswerValue &&
+        !/^\(?([A-GDTYF1-5])\)?[\.\)]?$/i.test(rawAnswerValue) &&
+        !/^(?:Doğru|Yanlış|True|False)$/i.test(rawAnswerValue) &&
+        !/^\(?([A-G])\)?[\)\.\-:]\s+\S/i.test(rawAnswerValue) &&
+        !/^([A-GDTYF])(?:\b|[\.\)])/i.test(rawAnswerValue));
+      if (hasQuestionTail || (hasClassicNonChoiceAnswer && (trailingLines.length > 0 || /\?\s*$/.test(validSeq[1].text)))) {
+        validSeq = null;
+      }
+    }
+
+    let qText = '';
+    let options = [];
+    let correctAnswer = null;
+
+    if (validSeq && validSeq.length >= 2) {
+      const firstOptLineIdx = validSeq[0].lineIdx;
+      const stemParts = contentLines.slice(0, firstOptLineIdx).filter(Boolean);
+      qText = stemParts.join('\n').trim();
+
+      const seqLineSet = new Map(validSeq.map((item, sIdx) => [item.lineIdx, sIdx]));
+
+      for (let i = firstOptLineIdx; i < contentLines.length; i++) {
+        if (seqLineSet.has(i)) {
+          const item = validSeq[seqLineSet.get(i)];
+          let optText = item.text;
+          if (/[\*\✓]$|\(Doğru\)|\(True\)|\[x\]$/i.test(optText)) {
+            correctAnswer = item.letter;
+            optText = optText.replace(/[\*\✓]$|\(Doğru\)|\(True\)|\[x\]$/i, '').trim();
+          } else if (item.hasLeadingStar) {
+            correctAnswer = item.letter;
+          }
+          options.push({
+            letter: item.letter,
+            text: optText
+          });
         } else if (options.length > 0) {
-          options[options.length - 1].text += ' ' + line;
-        } else {
-          qText += (qText ? ' ' : '') + line;
+          options[options.length - 1].text += (options[options.length - 1].text ? ' ' : '') + contentLines[i];
         }
+      }
+    } else {
+      // Geçerli bir şık dizisi yoksa (ör. metin içinde tek bir A. veya E-posta geçtiyse)
+      // metnin HİÇBİR kısmı atılmaz, tamamı soru kökünde kalır!
+      qText = contentLines.filter(Boolean).join('\n').trim();
+    }
+
+    // Cevap satırını yorumla
+    if (rawAnswerValue) {
+      const singleToken = rawAnswerValue.match(/^\(?([A-GDTYF1-5])\)?[\.\)]?$/i);
+      const prefixedOption = rawAnswerValue.match(/^\(?([A-G])\)?[\)\.\-:]\s+\S/i);
+      if (singleToken) {
+        const tok = singleToken[1].toUpperCase();
+        const numToLetter = { '1': 'A', '2': 'B', '3': 'C', '4': 'D', '5': 'E' };
+        correctAnswer = numToLetter[tok] || tok;
+      } else if (/^(?:Doğru|True)$/i.test(rawAnswerValue)) {
+        correctAnswer = options.length === 2 ? 'D' : rawAnswerValue;
+      } else if (/^(?:Yanlış|False)$/i.test(rawAnswerValue)) {
+        correctAnswer = options.length === 2 ? 'Y' : rawAnswerValue;
+      } else if (options.length >= 2 && prefixedOption) {
+        correctAnswer = prefixedOption[1].toUpperCase();
+      } else if (options.length >= 2) {
+        // Seçenekli soruda tek harf dışındaki uzun cevap yazılmışsa ilk eşleşen harfi dene veya metni koru
+        const letterPrefix = rawAnswerValue.match(/^([A-GDTYF])(?:\b|[\.\)])/i);
+        correctAnswer = letterPrefix ? letterPrefix[1].toUpperCase() : rawAnswerValue;
+      } else {
+        // Klasik soruda cevabın TAMAMINI koru ("Fosil yakıt kullanımı...", "Ankara" vb.)
+        correctAnswer = rawAnswerValue;
       }
     }
 
@@ -1863,7 +2504,7 @@ function parseBulkText(rawText) {
         explanation: explanation
       });
     } else {
-      // Şık yok veya tek şık -> Klasik / Açık Uçlu soru
+      // Şık yok -> Klasik / Açık Uçlu soru
       questions.push({
         id: 'q-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
         type: 'classic',
@@ -1961,6 +2602,7 @@ window.addOptionToQuestion = addOptionToQuestion;
 window.removeOptionFromQuestion = removeOptionFromQuestion;
 window.setCorrectOption = setCorrectOption;
 window.updateOptionText = updateOptionText;
+window.autoResizeTextarea = autoResizeTextarea;
 window.openBulkModal = openBulkModal;
 window.closeBulkModal = closeBulkModal;
 window.executeBulkImport = executeBulkImport;

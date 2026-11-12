@@ -9,6 +9,8 @@ const SAMPLE_EXAM_DATA = {
     course: "FEN BİLİMLERİ & GENEL KÜLTÜR",
     classGrade: "10. Sınıf",
     duration: "40 Dakika",
+    durationMinutes: 40,
+    testModeBehavior: "lock_reveal",
     examDate: "21.10.2025",
     instructions: "Sınav süresi 40 dakikadır. Çoktan seçmeli sorularda yalnızca bir doğru seçenek vardır. Yanlış cevaplar doğruları götürmez. Başarılar dileriz.",
     showScoreBox: true,

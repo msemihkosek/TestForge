@@ -147,13 +147,13 @@
       
       <!-- SOL PANEL: Düzenleyici (Editor) -->
       <aside class="editor-panel">
-        <!-- Sekmeler (Test modunda gizlenir, Sınav Kağıdı modunda gösterilir) -->
+        <!-- Sekmeler -->
         <div id="editor-tabs-bar" class="editor-tabs">
           <button id="tab-questions-btn" class="tab-btn active">
             <i data-lucide="list-checks"></i> <span data-i18n="tab_questions">Sorular</span>
           </button>
           <button id="tab-settings-btn" class="tab-btn">
-            <i data-lucide="sliders"></i> <span data-i18n="tab_settings">Sınav Ayarları & Başlık</span>
+            <i data-lucide="sliders"></i> <span id="tab-settings-label" data-i18n="tab_settings">Sınav Ayarları & Başlık</span>
           </button>
         </div>
 
@@ -187,8 +187,10 @@
           </div>
         </div>
 
-        <!-- SEKME 2: Sınav Ayarları & Kurumsal Başlık (Yalnızca Sınav Kağıdı Modunda) -->
+        <!-- SEKME 2: Ayarlar (Moda göre Sınav Kağıdı veya Dijital Test ayarları gösterilir) -->
         <div id="view-settings-tab" class="editor-body" style="display: none;">
+          <!-- SINAV KAĞIDI MODU AYARLARI -->
+          <div id="paper-settings-sections" class="settings-sections-stack">
           <div class="editor-card">
             <div class="card-title">
               <span><i data-lucide="school" style="color:var(--primary);"></i> <span data-i18n="settings_header_title">Sınav Kağıdı Üst Bilgisi</span></span>
@@ -251,6 +253,58 @@
                 <input type="checkbox" id="setting-show-optical" checked>
                 <span data-i18n="chk_optical">Optik İşaretleme Formu Ekle</span>
               </label>
+            </div>
+          </div>
+          </div>
+
+          <!-- DİJİTAL TEST MODU AYARLARI -->
+          <div id="test-settings-sections" class="settings-sections-stack" style="display: none;">
+            <div class="editor-card">
+              <div class="card-title">
+                <span><i data-lucide="sparkles" style="color:#db2777;"></i> <span data-i18n="test_settings_info_title">Test Bilgileri & Süre</span></span>
+              </div>
+              <p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:10px;" data-i18n="test_settings_info_desc">
+                Test adı, ders ve süre ayarları canlı önizlemeye ve indirilen HTML dosyasına doğrudan uygulanır.
+              </p>
+              <div class="form-group">
+                <label class="form-label" for="setting-test-title" data-i18n="lbl_test_title">Test İsmi / Başlığı</label>
+                <input type="text" id="setting-test-title" class="form-input" data-i18n-placeholder="placeholder_test_title" placeholder="Örn: 1. Ünite Değerlendirme Testi">
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="setting-test-course" data-i18n="lbl_test_course">Ders İsmi</label>
+                  <input type="text" id="setting-test-course" class="form-input" data-i18n-placeholder="placeholder_test_course" placeholder="Örn: Fizik">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="setting-test-duration-minutes" data-i18n="lbl_test_duration_min">Test Süresi (Dakika)</label>
+                  <input type="number" id="setting-test-duration-minutes" class="form-input" min="0" max="600" step="1" placeholder="Örn: 30">
+                </div>
+              </div>
+              <p style="font-size:0.75rem; color:var(--text-muted); line-height:1.45; margin-top:4px;" data-i18n="test_duration_hint">
+                0 girerseniz test süresiz olur. Süre girildiğinde HTML dosyasında "Sınava Başla" butonuna basınca geri sayım başlar ve süre bitince sınav otomatik tamamlanır.
+              </p>
+            </div>
+
+            <div class="editor-card">
+              <div class="card-title">
+                <span><i data-lucide="shield-check" style="color:var(--primary);"></i> <span data-i18n="test_settings_behavior_title">Cevaplama & Geri Bildirim Modu</span></span>
+              </div>
+              <div class="test-behavior-grid">
+                <label class="behavior-card">
+                  <input type="radio" name="test-mode-behavior" value="lock_reveal" checked>
+                  <div class="behavior-card-content">
+                    <div class="behavior-card-title" data-i18n="test_behavior_lock_title">İşaretlenen Şık Değiştirilemesin (Anında Doğru/Yanlış)</div>
+                    <div class="behavior-card-desc" data-i18n="test_behavior_lock_desc">Bir şık seçildikten sonra değiştirilemez; doğru veya yanlış olduğu ve açıklaması anında gösterilir.</div>
+                  </div>
+                </label>
+                <label class="behavior-card">
+                  <input type="radio" name="test-mode-behavior" value="allow_change">
+                  <div class="behavior-card-content">
+                    <div class="behavior-card-title" data-i18n="test_behavior_change_title">İşaretlenen Şık Değiştirilebilsin (Sonuçlar Bitimde)</div>
+                    <div class="behavior-card-desc" data-i18n="test_behavior_change_desc">Testi çözen kişi şıkları değiştirebilir; doğru/yanlış durumu test bitene kadar gösterilmez.</div>
+                  </div>
+                </label>
+              </div>
             </div>
           </div>
         </div>

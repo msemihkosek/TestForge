@@ -12,15 +12,59 @@ const Exporter = {
    */
   exportInteractiveHTML(examData, lang = 'tr') {
     const isEn = (lang === 'en');
-    const jsonExam = JSON.stringify(examData).replace(/<\/script>/g, '<\\/script>');
+    const safeExamData = JSON.parse(JSON.stringify(examData || { meta: {}, questions: [] }));
+    if (!safeExamData.meta) safeExamData.meta = {};
+    if (!Array.isArray(safeExamData.questions)) safeExamData.questions = [];
+
+    const parseMinutes = (val) => {
+      if (val === null || val === undefined) return 0;
+      const raw = String(val).trim();
+      if (!raw || /süresiz|untimed|yok|none/i.test(raw)) return 0;
+      const m = raw.match(/(\d+)/);
+      if (!m) return 0;
+      const n = parseInt(m[1], 10);
+      return Number.isFinite(n) && n > 0 ? Math.min(n, 600) : 0;
+    };
+
+    const meta = safeExamData.meta;
+    const durationMinutes = (meta.durationMinutes !== undefined && meta.durationMinutes !== null && !Number.isNaN(Number(meta.durationMinutes)))
+      ? Math.max(0, Math.min(600, Math.floor(Number(meta.durationMinutes))))
+      : parseMinutes(meta.duration);
+    const behavior = (meta.testModeBehavior === 'allow_change') ? 'allow_change' : 'lock_reveal';
+
+    meta.durationMinutes = durationMinutes;
+    meta.testModeBehavior = behavior;
+
+    const escapeBuildHtml = (str) => {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    };
+
+    const jsonExam = JSON.stringify(safeExamData).replace(/<\/script>/gi, '<\\/script>');
     const ui = isEn ? {
       lang: 'en',
       defaultTitle: 'Interactive Quiz',
       courseLabel: 'Subject',
       generalCourse: 'General',
-      totalLabel: 'Total Questions',
-      durationLabel: 'Duration',
-      notSpecified: 'Not specified',
+      totalLabel: 'Questions',
+      durationLabel: 'Time Limit',
+      remainingLabel: 'Time Left',
+      untimedLabel: 'Untimed',
+      minutesWord: 'Minutes',
+      minutesShort: 'min',
+      modeLabel: 'Answer Rule',
+      modeLockTitle: 'Locked Answers (Instant Feedback)',
+      modeLockDesc: 'Once you select an option, it cannot be changed and right/wrong feedback appears immediately.',
+      modeChangeTitle: 'Editable Answers (End Results)',
+      modeChangeDesc: 'You can change your selected options freely; right/wrong status is shown only when the exam ends.',
+      startTitleNote: 'Click "Start Exam" when you are ready. If a time limit is set, the countdown starts the moment you begin and automatically submits the exam when time expires.',
+      startBtn: 'Start Exam ▶',
+      noQuestionsWarning: 'No questions found in this quiz.',
       prevBtn: '‹ Previous Question',
       finishBtn: 'Finish Exam ✓',
       nextBtn: 'Next Question ›',
@@ -29,7 +73,11 @@ const Exporter = {
       pointsWord: 'Points',
       insightHeading: 'Why Correct? / Explanation',
       whyCorrect: '💡 <strong>Why Correct? / Explanation:</strong> ',
-      congratsTitle: 'Congratulations! Exam Completed 🎉',
+      correctChoiceNote: 'Correct choice:',
+      confirmUnanswered: 'You have {n} unanswered question(s). Finish the exam anyway?',
+      confirmFinish: 'Do you want to finish the exam and view your results?',
+      timeoutBanner: '⏰ Time is up! Your exam was automatically finished and graded.',
+      congratsTitle: 'Exam Completed 🎉',
       scoreLabel: 'FINAL SCORE',
       correctLabel: 'Correct',
       wrongLabel: 'Wrong',
@@ -47,9 +95,20 @@ const Exporter = {
       defaultTitle: 'İnteraktif Test',
       courseLabel: 'Ders',
       generalCourse: 'Genel',
-      totalLabel: 'Toplam Soru',
+      totalLabel: 'Soru Sayısı',
       durationLabel: 'Süre',
-      notSpecified: 'Belirtilmedi',
+      remainingLabel: 'Kalan Süre',
+      untimedLabel: 'Süresiz',
+      minutesWord: 'Dakika',
+      minutesShort: 'dk',
+      modeLabel: 'Cevaplama Kuralı',
+      modeLockTitle: 'Şık Kilitli (Anında Geri Bildirim)',
+      modeLockDesc: 'Bir şık işaretlendikten sonra değiştirilemez ve doğru/yanlış durumu hemen gösterilir.',
+      modeChangeTitle: 'Değiştirilebilir (Sonuç Bitimde)',
+      modeChangeDesc: 'Test boyunca şıklar arasında değişiklik yapılabilir; doğru/yanlış durumu sadece sınav bitiminde gösterilir.',
+      startTitleNote: 'Hazır olduğunuzda "Sınava Başla" butonuna tıklayın. Süre tanımlıysa geri sayım bastığınız anda başlar ve süre dolduğunda sınav otomatik olarak sonlanır.',
+      startBtn: 'Sınava Başla ▶',
+      noQuestionsWarning: 'Bu testte henüz soru bulunmuyor.',
       prevBtn: '‹ Önceki Soru',
       finishBtn: 'Sınavı Bitir ✓',
       nextBtn: 'Sonraki Soru ›',
@@ -58,7 +117,11 @@ const Exporter = {
       pointsWord: 'Puan',
       insightHeading: 'NEDEN DOĞRU? / ÇÖZÜM AÇIKLAMASI',
       whyCorrect: '💡 <strong>Neden Doğru? / Açıklama:</strong> ',
-      congratsTitle: 'Tebrikler! Sınav Tamamlandı 🎉',
+      correctChoiceNote: 'Doğru şık:',
+      confirmUnanswered: 'Henüz cevaplamadığınız {n} soru var. Sınavı yine de bitirmek istiyor musunuz?',
+      confirmFinish: 'Sınavı tamamlayıp sonuçlarınızı görmek istiyor musunuz?',
+      timeoutBanner: '⏰ Süre doldu! Sınavınız otomatik olarak sonlandırıldı ve puanlandı.',
+      congratsTitle: 'Sınav Tamamlandı 🎉',
       scoreLabel: 'BAŞARI PUANI',
       correctLabel: 'Doğru',
       wrongLabel: 'Yanlış',
@@ -72,13 +135,22 @@ const Exporter = {
       solutionTag: '💡 Çözüm/Açıklama:',
       filenameSuffix: '_interaktif_test.html'
     };
+
+    const resolvedTitle = (meta.title && String(meta.title).trim()) ? String(meta.title).trim() : ui.defaultTitle;
+    const resolvedCourse = (meta.course && String(meta.course).trim()) ? String(meta.course).trim() : ui.generalCourse;
+    const resolvedInstitution = (meta.institution && String(meta.institution).trim()) ? String(meta.institution).trim() : '';
+    const initialDurationText = durationMinutes > 0
+      ? `${durationMinutes} ${ui.minutesWord}`
+      : ui.untimedLabel;
+    const modeSummaryTitle = behavior === 'lock_reveal' ? ui.modeLockTitle : ui.modeChangeTitle;
+    const modeSummaryDesc = behavior === 'lock_reveal' ? ui.modeLockDesc : ui.modeChangeDesc;
     
     const htmlTemplate = `<!DOCTYPE html>
 <html lang="${ui.lang}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${examData.meta.title || ui.defaultTitle}</title>
+  <title>${escapeBuildHtml(resolvedTitle)}</title>
   <link rel="icon" type="image/png" href="${TESTFORGE_LOGO_BASE64}">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -173,6 +245,65 @@ const Exporter = {
       background: var(--primary);
       color: #fff;
       font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      transition: background 0.25s ease, transform 0.25s ease;
+    }
+    .timer-pill.timer-warning {
+      background: var(--danger);
+      animation: timerPulse 1s infinite;
+    }
+    @keyframes timerPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
+    }
+    .start-card {
+      text-align: center;
+      padding: 2.5rem 2.25rem;
+    }
+    .start-info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin: 1.5rem 0;
+      text-align: left;
+    }
+    .start-info-item {
+      padding: 1rem 1.15rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .start-info-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .start-info-val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .start-rule-box {
+      background: rgba(79, 70, 229, 0.08);
+      border: 1px solid rgba(79, 70, 229, 0.22);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      text-align: left;
+      margin-bottom: 1.5rem;
+      font-size: 0.96rem;
+      color: var(--text);
+    }
+    .timeout-banner {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1.5px solid var(--danger);
+      color: var(--danger);
+      padding: 0.9rem 1.2rem;
+      border-radius: 12px;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
     }
     .progress-bar-container {
       background: var(--border);
@@ -263,6 +394,9 @@ const Exporter = {
       line-height: 1.55;
       margin-bottom: 1.75rem;
       color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: break-word;
     }
     .q-image {
       max-width: 100%;
@@ -309,6 +443,24 @@ const Exporter = {
       color: var(--primary);
       font-weight: 700;
       box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
+    }
+    @media (prefers-color-scheme: dark) {
+      .option-btn.selected {
+        background: rgba(79, 70, 229, 0.25);
+        color: #c7d2fe;
+      }
+      .option-btn.is-correct {
+        color: #6ee7b7 !important;
+      }
+      .option-btn.is-wrong {
+        color: #fca5a5 !important;
+      }
+    }
+    .option-btn.is-locked {
+      cursor: default;
+    }
+    .option-btn.is-locked:hover {
+      transform: none;
     }
     .option-btn.is-correct {
       border-color: var(--success) !important;
@@ -447,6 +599,8 @@ const Exporter = {
       font-size: 1.05rem;
       line-height: 1.6;
       color: var(--text);
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
     }
 
     /* ==========================================================================
@@ -610,32 +764,62 @@ const Exporter = {
         <img src="${TESTFORGE_LOGO_BASE64}" style="width:26px; height:26px; border-radius:6px; box-shadow:0 2px 8px rgba(0,0,0,0.12);" alt="TestForge">
         <span style="font-size:0.85rem; font-weight:700; color:var(--primary); letter-spacing:0.8px; text-transform:uppercase;">TestForge</span>
       </div>
-      <div class="institution-name">${examData.meta.institution || ''}</div>
-      <h1 class="test-title">${examData.meta.title || ui.defaultTitle}</h1>
+      ${resolvedInstitution ? `<div class="institution-name">${escapeBuildHtml(resolvedInstitution)}</div>` : ''}
+      <h1 class="test-title">${escapeBuildHtml(resolvedTitle)}</h1>
       <div class="test-meta-pills">
-        <span class="pill">${ui.courseLabel}: ${examData.meta.course || ui.generalCourse}</span>
-        <span class="pill">${ui.totalLabel}: ${examData.questions.length}</span>
-        <span class="pill timer-pill" id="timer-display">${ui.durationLabel}: ${examData.meta.duration || ui.notSpecified}</span>
+        <span class="pill">${escapeBuildHtml(ui.courseLabel)}: ${escapeBuildHtml(resolvedCourse)}</span>
+        <span class="pill">${escapeBuildHtml(ui.totalLabel)}: ${safeExamData.questions.length}</span>
+        <span class="pill timer-pill" id="timer-display">${escapeBuildHtml(ui.durationLabel)}: ${escapeBuildHtml(initialDurationText)}</span>
       </div>
-      <div class="progress-bar-container">
+      <div class="progress-bar-container" id="progress-bar-container" style="display: none;">
         <div class="progress-bar-fill" id="progress-bar"></div>
       </div>
-      <div class="nav-tabs" id="nav-tabs"></div>
+      <div class="nav-tabs" id="nav-tabs" style="display: none;"></div>
     </header>
 
-    <main id="quiz-container">
+    <section class="card start-card" id="start-screen">
+      <h2 style="font-size:1.45rem; font-weight:800; margin-bottom:0.5rem;">${escapeBuildHtml(resolvedTitle)}</h2>
+      <p style="color:var(--text-muted); font-size:0.98rem;">${escapeBuildHtml(ui.startTitleNote)}</p>
+      <div class="start-info-grid">
+        <div class="start-info-item">
+          <div class="start-info-label">${escapeBuildHtml(ui.courseLabel)}</div>
+          <div class="start-info-val">${escapeBuildHtml(resolvedCourse)}</div>
+        </div>
+        <div class="start-info-item">
+          <div class="start-info-label">${escapeBuildHtml(ui.totalLabel)}</div>
+          <div class="start-info-val">${safeExamData.questions.length}</div>
+        </div>
+        <div class="start-info-item">
+          <div class="start-info-label">${escapeBuildHtml(ui.durationLabel)}</div>
+          <div class="start-info-val">${escapeBuildHtml(initialDurationText)}</div>
+        </div>
+        <div class="start-info-item">
+          <div class="start-info-label">${escapeBuildHtml(ui.modeLabel)}</div>
+          <div class="start-info-val">${escapeBuildHtml(modeSummaryTitle)}</div>
+        </div>
+      </div>
+      <div class="start-rule-box">
+        <strong>${escapeBuildHtml(modeSummaryTitle)}:</strong> ${escapeBuildHtml(modeSummaryDesc)}
+      </div>
+      ${safeExamData.questions.length > 0
+        ? `<button type="button" class="btn btn-primary" id="btn-start-exam" style="padding:16px 38px; font-size:1.1rem;" onclick="startExam()">${escapeBuildHtml(ui.startBtn)}</button>`
+        : `<p style="color:var(--danger); font-weight:700;">${escapeBuildHtml(ui.noQuestionsWarning)}</p>`
+      }
+    </section>
+
+    <main id="quiz-container" style="display: none;">
       <div class="card" id="question-card">
         <!-- Aktif soru JS ile render edilir -->
       </div>
       <div class="bottom-actions">
-        <button class="btn btn-secondary" id="btn-prev" onclick="prevQuestion()">${ui.prevBtn}</button>
-        <button class="btn btn-success" id="btn-finish" onclick="finishExam()">${ui.finishBtn}</button>
-        <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()">${ui.nextBtn}</button>
+        <button class="btn btn-secondary" id="btn-prev" onclick="prevQuestion()">${escapeBuildHtml(ui.prevBtn)}</button>
+        <button class="btn btn-success" id="btn-finish" onclick="finishExam(false)">${escapeBuildHtml(ui.finishBtn)}</button>
+        <button class="btn btn-primary" id="btn-next" onclick="nextQuestion()">${escapeBuildHtml(ui.nextBtn)}</button>
       </div>
     </main>
 
     <div id="result-container" class="card result-view" style="display: none;"></div>
-    <footer style="text-align:center; margin:2.2rem 0 1rem; color:var(--text-light); font-size:0.85rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+    <footer style="text-align:center; margin:2.2rem 0 1rem; color:var(--text-muted); font-size:0.85rem; display:flex; align-items:center; justify-content:center; gap:6px;">
       <img src="${TESTFORGE_LOGO_BASE64}" style="width:16px; height:16px; border-radius:4px;" alt="TestForge">
       <span>Powered by <strong>TestForge</strong></span>
     </footer>
@@ -644,22 +828,151 @@ const Exporter = {
   <script>
     const exam = ${jsonExam};
     const ui = ${JSON.stringify(ui)};
+    const examConfig = {
+      durationMinutes: ${durationMinutes},
+      behavior: ${JSON.stringify(behavior)}
+    };
     let currentIndex = 0;
-    const userAnswers = {};
-    const revealed = {};
+    let userAnswers = {};
+    let revealed = {};
     let isFinished = false;
+    let hasStarted = false;
+    let timerInterval = null;
+    let endTimestamp = null;
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatCountdown(totalSeconds) {
+      const sec = Math.max(0, Math.floor(totalSeconds));
+      const hrs = Math.floor(sec / 3600);
+      const mins = Math.floor((sec % 3600) / 60);
+      const rem = sec % 60;
+      const pad = (n) => String(n).padStart(2, '0');
+      if (hrs > 0) {
+        return pad(hrs) + ':' + pad(mins) + ':' + pad(rem);
+      }
+      return pad(mins) + ':' + pad(rem);
+    }
+
+    function stopTimer() {
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+    }
+
+    function updateTimerDisplay(remainingSec) {
+      const timerEl = document.getElementById('timer-display');
+      if (!timerEl) return;
+      if (examConfig.durationMinutes <= 0) {
+        timerEl.textContent = ui.durationLabel + ': ' + ui.untimedLabel;
+        timerEl.classList.remove('timer-warning');
+        return;
+      }
+      if (!hasStarted) {
+        timerEl.textContent = ui.durationLabel + ': ' + examConfig.durationMinutes + ' ' + ui.minutesWord;
+        timerEl.classList.remove('timer-warning');
+        return;
+      }
+      timerEl.textContent = ui.remainingLabel + ': ' + formatCountdown(remainingSec);
+      if (remainingSec > 0 && remainingSec <= 60) {
+        timerEl.classList.add('timer-warning');
+      } else {
+        timerEl.classList.remove('timer-warning');
+      }
+    }
+
+    function tickTimer() {
+      if (!hasStarted || isFinished || examConfig.durationMinutes <= 0) {
+        stopTimer();
+        return;
+      }
+      const remainingMs = endTimestamp - Date.now();
+      const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      updateTimerDisplay(remainingSec);
+      if (remainingMs <= 0) {
+        stopTimer();
+        finishExam(true);
+      }
+    }
 
     function init() {
+      stopTimer();
+      hasStarted = false;
+      isFinished = false;
+      currentIndex = 0;
+      userAnswers = {};
+      revealed = {};
+      endTimestamp = null;
+
+      const startEl = document.getElementById('start-screen');
+      const quizEl = document.getElementById('quiz-container');
+      const navEl = document.getElementById('nav-tabs');
+      const progEl = document.getElementById('progress-bar-container');
+      const resEl = document.getElementById('result-container');
+
+      if (startEl) startEl.style.display = 'block';
+      if (quizEl) quizEl.style.display = 'none';
+      if (navEl) navEl.style.display = 'none';
+      if (progEl) progEl.style.display = 'none';
+      if (resEl) resEl.style.display = 'none';
+
+      updateTimerDisplay(examConfig.durationMinutes * 60);
+    }
+
+    function startExam() {
+      if (!exam.questions || exam.questions.length === 0) return;
+      stopTimer();
+      hasStarted = true;
+      isFinished = false;
+      currentIndex = 0;
+      userAnswers = {};
+      revealed = {};
+
+      const startEl = document.getElementById('start-screen');
+      const quizEl = document.getElementById('quiz-container');
+      const navEl = document.getElementById('nav-tabs');
+      const progEl = document.getElementById('progress-bar-container');
+      const resEl = document.getElementById('result-container');
+
+      if (startEl) startEl.style.display = 'none';
+      if (resEl) resEl.style.display = 'none';
+      if (progEl) progEl.style.display = 'block';
+      if (navEl) navEl.style.display = 'flex';
+      if (quizEl) quizEl.style.display = 'block';
+
+      if (examConfig.durationMinutes > 0) {
+        endTimestamp = Date.now() + examConfig.durationMinutes * 60 * 1000;
+        tickTimer();
+        timerInterval = setInterval(tickTimer, 250);
+      } else {
+        updateTimerDisplay(0);
+      }
+
       renderNavTabs();
       showQuestion(0);
     }
 
+    function restartExam() {
+      init();
+    }
+
     function renderNavTabs() {
       const container = document.getElementById('nav-tabs');
+      if (!container) return;
       container.innerHTML = '';
       exam.questions.forEach((q, idx) => {
         const btn = document.createElement('button');
-        btn.className = 'q-nav-btn' + (idx === currentIndex ? ' active' : '') + (userAnswers[q.id] ? ' answered' : '');
+        const hasAns = !!(userAnswers[q.id] && String(userAnswers[q.id]).trim());
+        btn.className = 'q-nav-btn' + (idx === currentIndex ? ' active' : '') + (hasAns ? ' answered' : '');
         btn.textContent = (idx + 1);
         btn.onclick = () => showQuestion(idx);
         container.appendChild(btn);
@@ -668,9 +981,11 @@ const Exporter = {
     }
 
     function updateProgressBar() {
-      const answeredCount = Object.keys(userAnswers).length;
+      const bar = document.getElementById('progress-bar');
+      if (!bar || !exam.questions.length) return;
+      const answeredCount = exam.questions.filter(q => userAnswers[q.id] && String(userAnswers[q.id]).trim()).length;
       const pct = (answeredCount / exam.questions.length) * 100;
-      document.getElementById('progress-bar').style.width = pct + '%';
+      bar.style.width = pct + '%';
     }
 
     function showQuestion(idx) {
@@ -678,43 +993,48 @@ const Exporter = {
       currentIndex = idx;
       const q = exam.questions[idx];
       const card = document.getElementById('question-card');
-      const isRevealed = !!revealed[q.id];
+      const isLockedMode = (examConfig.behavior === 'lock_reveal');
+      const isRevealed = isLockedMode && !!revealed[q.id];
 
       let optionsHtml = '';
       if (q.type === 'multiple' || q.type === 'true_false') {
-        optionsHtml = '<div class="options-grid">' + q.options.map(opt => {
+        optionsHtml = '<div class="options-grid">' + (q.options || []).map((opt, optIdx) => {
           const isSelected = userAnswers[q.id] === opt.letter;
           let extraClass = '';
           if (isRevealed) {
-            if (opt.letter === q.correctAnswer) extraClass = 'is-correct';
-            else if (isSelected) extraClass = 'is-wrong';
+            if (opt.letter === q.correctAnswer) extraClass = 'is-correct is-locked';
+            else if (isSelected) extraClass = 'is-wrong is-locked';
+            else extraClass = 'is-locked';
           }
           return \`
-            <div class="option-btn \${extraClass} \${isSelected ? 'selected' : ''}" onclick="selectAnswer('\${q.id}', '\${opt.letter}')">
-              <span class="opt-key">\${opt.letter}</span>
-              <span style="flex:1;">\${opt.text}</span>
-              \${isRevealed && opt.letter === q.correctAnswer ? '<span style="color:var(--success); font-weight:bold;">✓</span>' : ''}
-              \${isRevealed && isSelected && opt.letter !== q.correctAnswer ? '<span style="color:var(--danger); font-weight:bold;">✗</span>' : ''}
-            </div>
+            <button type="button" class="option-btn \${extraClass} \${isSelected ? 'selected' : ''}" \${isRevealed ? 'disabled' : ''} onclick="selectAnswerByIdx(\${idx}, \${optIdx})">
+              <span class="opt-key">\${escapeHtml(opt.letter)}</span>
+              <span style="flex:1; min-width:0; white-space:pre-wrap; overflow-wrap:break-word; word-break:break-word;">\${escapeHtml(opt.text)}</span>
+              \${isRevealed && opt.letter === q.correctAnswer ? '<span style="color:var(--success); font-weight:bold; flex-shrink:0;">✓</span>' : ''}
+              \${isRevealed && isSelected && opt.letter !== q.correctAnswer ? '<span style="color:var(--danger); font-weight:bold; flex-shrink:0;">✗</span>' : ''}
+            </button>
           \`;
         }).join('') + '</div>';
       } else {
         const currentText = userAnswers[q.id] || '';
         optionsHtml = \`
-          <textarea class="classic-answer-box" placeholder="Cevabınızı buraya yazınız..." oninput="recordClassicAnswer('\${q.id}', this.value)">\${currentText}</textarea>
+          <textarea class="classic-answer-box" placeholder="\${escapeHtml(ui.classicPlaceholder)}" oninput="recordClassicAnswerByIdx(\${idx}, this.value)">\${escapeHtml(currentText)}</textarea>
         \`;
       }
 
-      const insightBlock = (isRevealed && q.explanation) ? \`
+      const insightText = q.explanation
+        ? escapeHtml(q.explanation)
+        : (escapeHtml(ui.correctChoiceNote) + ' <strong>' + escapeHtml(q.correctAnswer || '') + '</strong>');
+      const insightBlock = (isRevealed && (q.explanation || q.correctAnswer)) ? \`
         <div class="explanation-box">
-          \${ui.whyCorrect} \${q.explanation}
+          \${ui.whyCorrect} \${insightText}
         </div>
       \` : '';
 
       card.innerHTML = \`
-        <div class="q-badge">\${ui.questionWord} \${idx + 1} / \${exam.questions.length} (\${q.points || 10} \${ui.pointsWord})</div>
-        <div class="q-text">\${q.text}</div>
-        \${q.image ? \`<img src="\${q.image}" class="q-image" alt="Question Image">\` : ''}
+        <div class="q-badge">\${escapeHtml(ui.questionWord)} \${idx + 1} / \${exam.questions.length} (\${q.points || 10} \${escapeHtml(ui.pointsWord)})</div>
+        <div class="q-text">\${escapeHtml(q.text)}</div>
+        \${q.image ? \`<img src="\${escapeHtml(q.image)}" class="q-image" alt="Question Image">\` : ''}
         \${optionsHtml}
         \${insightBlock}
       \`;
@@ -725,14 +1045,33 @@ const Exporter = {
     }
 
     function selectAnswer(qId, letter) {
-      userAnswers[qId] = letter;
-      revealed[qId] = true;
+      if (!hasStarted || isFinished) return;
+      if (examConfig.behavior === 'lock_reveal') {
+        if (revealed[qId]) return;
+        userAnswers[qId] = letter;
+        revealed[qId] = true;
+      } else {
+        userAnswers[qId] = letter;
+      }
       showQuestion(currentIndex);
     }
 
+    function selectAnswerByIdx(qIdx, optIdx) {
+      const q = exam.questions[qIdx];
+      if (!q || !q.options || !q.options[optIdx]) return;
+      selectAnswer(q.id, q.options[optIdx].letter);
+    }
+
     function recordClassicAnswer(qId, text) {
+      if (!hasStarted || isFinished) return;
       userAnswers[qId] = text;
       renderNavTabs();
+    }
+
+    function recordClassicAnswerByIdx(qIdx, text) {
+      const q = exam.questions[qIdx];
+      if (!q) return;
+      recordClassicAnswer(q.id, text);
     }
 
     function prevQuestion() {
@@ -743,19 +1082,29 @@ const Exporter = {
       if (currentIndex < exam.questions.length - 1) showQuestion(currentIndex + 1);
     }
 
-    function finishExam() {
-      const unanswered = exam.questions.length - Object.keys(userAnswers).length;
-      if (unanswered > 0) {
-        if (!confirm(\`Henüz cevaplamadığınız \${unanswered} soru var. Sınavı yine de bitirmek istiyor musunuz?\`)) {
-          return;
+    function finishExam(isAutoTimeout = false) {
+      if (!hasStarted || isFinished) return;
+
+      if (!isAutoTimeout) {
+        const unanswered = exam.questions.filter(q => !userAnswers[q.id] || !String(userAnswers[q.id]).trim()).length;
+        if (unanswered > 0) {
+          if (!confirm(ui.confirmUnanswered.replace('{n}', unanswered))) {
+            return;
+          }
+        } else {
+          if (!confirm(ui.confirmFinish)) return;
         }
-      } else {
-        if (!confirm('Sınavı tamamlayıp sonuçlarınızı görmek istiyor musunuz?')) return;
       }
 
+      stopTimer();
       isFinished = true;
+      const timerEl = document.getElementById('timer-display');
+      if (timerEl) timerEl.classList.remove('timer-warning');
+
       document.getElementById('quiz-container').style.display = 'none';
       document.getElementById('nav-tabs').style.display = 'none';
+      const progEl = document.getElementById('progress-bar-container');
+      if (progEl) progEl.style.display = 'none';
 
       let correctCount = 0;
       let wrongCount = 0;
@@ -767,8 +1116,9 @@ const Exporter = {
         const points = Number(q.points) || 10;
         maxTotalPoints += points;
         const studentAns = userAnswers[q.id];
+        const hasAns = !!(studentAns && String(studentAns).trim());
 
-        if (!studentAns) {
+        if (!hasAns) {
           emptyCount++;
         } else if (q.type === 'multiple' || q.type === 'true_false') {
           if (studentAns === q.correctAnswer) {
@@ -778,7 +1128,6 @@ const Exporter = {
             wrongCount++;
           }
         } else {
-          // Klasik soru
           correctCount++;
           totalEarnedPoints += points;
         }
@@ -792,28 +1141,43 @@ const Exporter = {
       const resDiv = document.getElementById('result-container');
       resDiv.style.display = 'block';
       resDiv.innerHTML = \`
+        \${isAutoTimeout ? \`<div class="timeout-banner">\${escapeHtml(ui.timeoutBanner)}</div>\` : ''}
         <div class="score-circle">
           <div class="score-num">\${scorePct}</div>
-          <div style="font-size: 0.8rem; font-weight:600;">\${ui.scoreLabel}</div>
+          <div style="font-size: 0.8rem; font-weight:600;">\${escapeHtml(ui.scoreLabel)}</div>
         </div>
-        <h2>\${ui.congratsTitle}</h2>
+        <h2>\${escapeHtml(ui.congratsTitle)}</h2>
         <div class="stats-row">
-          <div class="stat-item"><div style="color:var(--success); font-size:1.5rem; font-weight:800;">\${correctCount}</div><div>\${ui.correctLabel}</div></div>
-          <div class="stat-item"><div style="color:var(--danger); font-size:1.5rem; font-weight:800;">\${wrongCount}</div><div>\${ui.wrongLabel}</div></div>
-          <div class="stat-item"><div style="color:var(--text-muted); font-size:1.5rem; font-weight:800;">\${emptyCount}</div><div>\${ui.emptyLabel}</div></div>
+          <div class="stat-item"><div style="color:var(--success); font-size:1.5rem; font-weight:800;">\${correctCount}</div><div>\${escapeHtml(ui.correctLabel)}</div></div>
+          <div class="stat-item"><div style="color:var(--danger); font-size:1.5rem; font-weight:800;">\${wrongCount}</div><div>\${escapeHtml(ui.wrongLabel)}</div></div>
+          <div class="stat-item"><div style="color:var(--text-muted); font-size:1.5rem; font-weight:800;">\${emptyCount}</div><div>\${escapeHtml(ui.emptyLabel)}</div></div>
         </div>
-        <h3 style="text-align:left; margin-top:2rem; margin-bottom:1rem;">\${ui.reviewHeading}</h3>
+        <div style="margin: 1.5rem 0;">
+          <button type="button" class="btn btn-primary" onclick="restartExam()">\${escapeHtml(ui.restartBtn)}</button>
+        </div>
+        <h3 style="text-align:left; margin-top:2rem; margin-bottom:1rem;">\${escapeHtml(ui.reviewHeading)}</h3>
         \${exam.questions.map((q, idx) => {
           const userAns = userAnswers[q.id];
+          const hasAns = !!(userAns && String(userAns).trim());
           const isCorrect = userAns === q.correctAnswer;
+          let tagHtml = '';
+          if (q.type !== 'classic') {
+            if (!hasAns) {
+              tagHtml = '<span class="review-wrong">(' + escapeHtml(ui.correctLabel) + ': ' + escapeHtml(q.correctAnswer || '-') + ')</span>';
+            } else if (isCorrect) {
+              tagHtml = '<span class="review-correct">' + escapeHtml(ui.correctTag) + '</span>';
+            } else {
+              tagHtml = '<span class="review-wrong">' + escapeHtml(ui.wrongTag) + ' (' + escapeHtml(ui.correctLabel) + ': ' + escapeHtml(q.correctAnswer || '-') + ')</span>';
+            }
+          }
           return \`
               <div class="review-item">
-                <div style="font-weight:700; margin-bottom:4px;">\${idx + 1}. \${q.text}</div>
+                <div style="font-weight:700; margin-bottom:4px; white-space:pre-wrap; overflow-wrap:break-word;">\${idx + 1}. \${escapeHtml(q.text)}</div>
                 <div style="font-size:0.9rem;">
-                  \${ui.yourAnswer} <strong>\${userAns || ui.leftBlank}</strong> 
-                  \${q.type !== 'classic' ? (isCorrect ? '<span class="review-correct">' + ui.correctTag + '</span>' : '<span class="review-wrong">' + ui.wrongTag + ' (' + ui.correctLabel + ': ' + q.correctAnswer + ')</span>') : ''}
+                  \${escapeHtml(ui.yourAnswer)} <strong>\${hasAns ? escapeHtml(userAns) : escapeHtml(ui.leftBlank)}</strong>
+                  \${tagHtml}
                 </div>
-                \${q.explanation ? \`<div class="explanation-box">\${ui.solutionTag} \${q.explanation}</div>\` : ''}
+                \${q.explanation ? \`<div class="explanation-box">\${escapeHtml(ui.solutionTag)} \${escapeHtml(q.explanation)}</div>\` : ''}
               </div>
           \`;
         }).join('')}
@@ -829,7 +1193,9 @@ const Exporter = {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const cleanTitle = (examData.meta.title || 'test').toLowerCase().replace(/[^a-z0-9]/gi, '_');
+    const trMap = { 'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u', 'Ç': 'c', 'Ğ': 'g', 'Ö': 'o', 'Ş': 's', 'Ü': 'u' };
+    const normalizedTitle = resolvedTitle.replace(/[çğıİöşüÇĞÖŞÜ]/g, ch => trMap[ch] || ch);
+    const cleanTitle = normalizedTitle.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'test';
     a.download = `${cleanTitle}${ui.filenameSuffix}`;
     document.body.appendChild(a);
     a.click();

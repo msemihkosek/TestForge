@@ -46,6 +46,7 @@ const TRANSLATIONS = {
     // Sol Panel & Sekmeler
     tab_questions: "Sorular",
     tab_settings: "Sınav Ayarları & Başlık",
+    tab_test_settings: "Test Ayarları",
     card_add_question: "Yeni Soru Ekle",
     type_multiple: "Çoktan Seçmeli",
     type_tf: "Doğru / Yanlış",
@@ -75,6 +76,23 @@ const TRANSLATIONS = {
     chk_score: "Öğrenci Puan Kutucuğunu Göster",
     chk_answer_key: "Kağıt Sonunda Cevap Anahtarını Göster",
     chk_optical: "Optik İşaretleme Formu Ekle",
+
+    // Test Modu Ayarları
+    test_settings_info_title: "Test Bilgileri & Süre",
+    test_settings_info_desc: "Test adı, ders ve süre ayarları canlı önizlemeye ve indirilen HTML dosyasına doğrudan uygulanır.",
+    lbl_test_title: "Test İsmi / Başlığı",
+    placeholder_test_title: "Örn: 1. Ünite Değerlendirme Testi",
+    lbl_test_course: "Ders İsmi",
+    placeholder_test_course: "Örn: Fizik",
+    lbl_test_duration_min: "Test Süresi (Dakika)",
+    test_duration_hint: "0 girerseniz test süresiz olur. Süre girildiğinde HTML dosyasında \"Sınava Başla\" butonuna basınca geri sayım başlar ve süre bitince sınav otomatik tamamlanır.",
+    test_settings_behavior_title: "Cevaplama & Geri Bildirim Modu",
+    test_behavior_lock_title: "İşaretlenen Şık Değiştirilemesin (Anında Doğru/Yanlış)",
+    test_behavior_lock_desc: "Bir şık seçildikten sonra değiştirilemez; doğru veya yanlış olduğu ve açıklaması anında gösterilir.",
+    test_behavior_change_title: "İşaretlenen Şık Değiştirilebilsin (Sonuçlar Bitimde)",
+    test_behavior_change_desc: "Testi çözen kişi şıkları değiştirebilir; doğru/yanlış durumu test bitene kadar gösterilmez.",
+    test_untimed: "Süresiz",
+    test_minutes_short: "Dk",
 
     // Canlı Önizleme Üst Çubuğu
     preview_title_paper: "Canlı Sınav Kağıdı",
@@ -245,6 +263,7 @@ D) Gaz`,
     // Editor Panel & Tabs
     tab_questions: "Questions",
     tab_settings: "Exam Settings & Header",
+    tab_test_settings: "Quiz Settings",
     card_add_question: "Add New Question",
     type_multiple: "Multiple Choice",
     type_tf: "True / False",
@@ -274,6 +293,23 @@ D) Gaz`,
     chk_score: "Show Student Score Box",
     chk_answer_key: "Show Answer Key at End of Paper",
     chk_optical: "Add Optical Answer Sheet",
+
+    // Quiz Mode Settings
+    test_settings_info_title: "Quiz Info & Timer",
+    test_settings_info_desc: "Quiz title, subject, and time limit apply directly to the live preview and exported HTML quiz.",
+    lbl_test_title: "Quiz Name / Title",
+    placeholder_test_title: "e.g.: Unit 1 Assessment Quiz",
+    lbl_test_course: "Subject / Course Name",
+    placeholder_test_course: "e.g.: Physics",
+    lbl_test_duration_min: "Time Limit (Minutes)",
+    test_duration_hint: "Enter 0 for untimed. When a duration is set, the countdown starts upon clicking \"Start Exam\" in HTML and auto-submits when time runs out.",
+    test_settings_behavior_title: "Answering & Feedback Mode",
+    test_behavior_lock_title: "Lock Answer After Selection (Instant Feedback)",
+    test_behavior_lock_desc: "Once an option is selected it cannot be changed; right/wrong feedback and explanation appear immediately.",
+    test_behavior_change_title: "Allow Changing Answers (Reveal at End)",
+    test_behavior_change_desc: "Test-takers can freely change options; right/wrong status stays hidden until the quiz ends.",
+    test_untimed: "Untimed",
+    test_minutes_short: "Min",
 
     // Preview Toolbar
     preview_title_paper: "Live Exam Paper",

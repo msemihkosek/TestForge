@@ -1,7 +1,19 @@
-# ⚡ TestForge - Profesyonel Sınav Kağıdı & İnteraktif Test Hazırlama Aracı
-*(Professional Exam Paper & Interactive Quiz Maker)*
+<p align="center">
+  <img src="assets/logo.png" alt="TestForge Logo" width="110" style="border-radius: 24px;">
+</p>
 
-[🇹🇷 Türkçe](#türkçe-tanıtım) | [🇬🇧 English](#english-overview)
+<h1 align="center">TestForge</h1>
+
+<p align="center">
+  <strong>Sınav Kağıdı & İnteraktif Test Hazırlama Aracı</strong><br>
+  <em>Professional Exam Paper & Interactive Quiz Maker</em>
+</p>
+
+<p align="center">
+  <a href="#türkçe-tanıtım">🇹🇷 Türkçe Tanıtım</a> •
+  <a href="#english-overview">🇬🇧 English Overview</a> •
+  <a href="#nasıl-çalıştırılır--how-to-run">💻 Çalıştırma / How to Run</a>
+</p>
 
 ---
 
@@ -18,7 +30,7 @@
 ### 🌟 İki Ana Çalışma Modu
 
 1. **📄 Sınav Kağıdı Modu (Baskı & PDF Odaklı):**
-   - **A4 Sayfa Düzeni:** Resmi okul, MEB ve üniversite formatında tek veya 2 sütunlu gerçek sınav kağıdı simülasyonu.
+   - **A4 Sayfa Düzeni:** MEB, okul ve üniversite formatında tek veya 2 sütunlu gerçek sınav kağıdı simülasyonu.
    - **Kurumsal Başlık:** Kurum/okul adı, ders adı, sınav dönemi, tarih ve yönerge alanları.
    - **Öğrenci Bilgi & Puan Kutusu:** Ad-Soyad, Sınıf, Numara ve öğretmenin not verebileceği puan kutucuğu.
    - **Optik Form & Cevap Anahtarı:** Kağıt altına opsiyonel optik işaretleme kabarcıkları ve otomatik cevap anahtarı.
@@ -63,6 +75,7 @@
 
 ---
 
+<a id="nasıl-çalıştırılır--how-to-run"></a>
 ## 💻 Nasıl Çalıştırılır? / How to Run?
 
 Herhangi bir sunucu kurulumu veya derleme adımı gerektirmez *(No build or installation required)*.
